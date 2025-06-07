@@ -271,32 +271,32 @@ jobs:
         fi
 
   summary:
-  name: Test Summary
-  runs-on: ubuntu-latest
-  needs: [security-tests, code-quality, integration-tests]
-  if: always()
-  
-  steps:
-  - name: Report results
-    run: |
-      echo "🎯 Test Summary"
-      echo "==============="
-      echo "Security Tests: ${{ needs.security-tests.result }}"
-      echo "Code Quality: ${{ needs.code-quality.result }}"
-      echo "Integration: ${{ needs.integration-tests.result }}"
-      
-      if [[ "${{ needs.security-tests.result }}" == "success" && \
-            "${{ needs.code-quality.result }}" == "success" && \
-            "${{ needs.integration-tests.result }}" == "success" ]]; then
-        echo ""
-        echo "🎉 ALL TESTS PASSED!"
-        echo "✅ Security: HARDENED"
-        echo "✅ Quality: VERIFIED" 
-        echo "✅ Integration: WORKING"
-        echo ""
-        echo "🚀 Ready for production use!"
-      else
-        echo ""
-        echo "❌ Some tests failed - review and fix issues"
-        exit 1
-      fi
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [security-tests, code-quality, integration-tests]
+    if: always()
+    
+    steps:
+    - name: Report results
+      run: |
+        echo "🎯 Test Summary"
+        echo "==============="
+        echo "Security Tests: ${{ needs.security-tests.result }}"
+        echo "Code Quality: ${{ needs.code-quality.result }}"
+        echo "Integration: ${{ needs.integration-tests.result }}"
+        
+        if [[ "${{ needs.security-tests.result }}" == "success" && \
+              "${{ needs.code-quality.result }}" == "success" && \
+              "${{ needs.integration-tests.result }}" == "success" ]]; then
+          echo ""
+          echo "🎉 ALL TESTS PASSED!"
+          echo "✅ Security: HARDENED"
+          echo "✅ Quality: VERIFIED" 
+          echo "✅ Integration: WORKING"
+          echo ""
+          echo "🚀 Ready for production use!"
+        else
+          echo ""
+          echo "❌ Some tests failed - review and fix issues"
+          exit 1
+        fi
