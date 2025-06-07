@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# GitHub Project Setup Script for Property Renderer Consolidation
+# GitHub Project Setup Script
 # Enhanced with dry-run capability - CRITICAL for preventing accidental project creation
 
 set -e
@@ -9,10 +9,19 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/dry-run-utils.sh"
 
+# Load configuration utilities
+source "$SCRIPT_DIR/lib/config-utils.sh"
+
+# Load security utilities
+source "$SCRIPT_DIR/lib/security-utils.sh"
+
 # Parse arguments and initialize dry-run mode
 init_dry_run "$@"
 
-print_dry_run_header "Setting up GitHub Project: Property Renderer Consolidation"
+# Validate authentication
+validate_github_auth || exit 1
+
+print_dry_run_header "Setting up GitHub Project"
 
 if is_dry_run; then
     echo -e "${CYAN}🔍 DRY-RUN: This will show what would be created without making actual changes${NC}"
@@ -25,11 +34,11 @@ echo "📋 Creating project..."
 if is_dry_run; then
     # Mock project creation
     PROJECT_ID="MOCK_PROJECT_ID_PVT_kwHOCOLa384AXXXX"
-    PROJECT_URL="https://github.com/users/b-coman/projects/MOCK"
+    PROJECT_URL="https://github.com/users/MOCK_USER/projects/MOCK"
     PROJECT_NUMBER="MOCK_NUMBER"
     
     echo -e "${CYAN}🔍 DRY-RUN: Would execute GraphQL mutation:${NC}"
-    echo -e "${CYAN}   mutation { createProjectV2(input: { ownerId: \"U_kgDOCOLa3w\", title: \"Property Renderer Consolidation\" }) }${NC}"
+    echo -e "${CYAN}   mutation { createProjectV2(input: { ownerId: \"MOCK_USER_ID\", title: \"Your Project Title\" }) }${NC}"
     echo -e "${GREEN}✅ Mock project created successfully!${NC}"
     echo -e "${CYAN}   Mock Project ID: $PROJECT_ID${NC}"
     echo -e "${CYAN}   Mock Project URL: $PROJECT_URL${NC}"
@@ -39,7 +48,7 @@ else
         createProjectV2(
           input: {
             ownerId: "U_kgDOCOLa3w",
-            title: "Property Renderer Consolidation"
+            title: "$(get_config "project.title")"
           }
         ){
           projectV2 {

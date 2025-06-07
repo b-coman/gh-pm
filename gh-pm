@@ -92,11 +92,13 @@ EOF
         echo -e "${CYAN}🤖 AI MODE: Add --format=json to any command for structured output${NC}"
         echo ""
         echo -e "${YELLOW}SETUP COMMANDS:${NC}"
+        echo "  init                      Initialize configuration for new user/project"
+        echo "  configure                 Validate and show current configuration"
+        echo "  setup-fields              Create standard project fields"
         echo "  setup                     Create new GitHub project with fields"
     echo "  setup-complete            Master project setup (recommended)"
     echo "  setup-repo               Alternative repo-based setup"
     echo "  setup-simple             Simplified project configuration"
-    echo "  configure                 Configure project fields and options"
     echo "  status                    Show project dashboard"
     echo "  workflow-status           Show workflow-specific status"
     echo ""
@@ -580,28 +582,64 @@ if [[ -z "$COMMAND" ]]; then
     exit 0
 fi
 
+# Load configuration utilities
+source "$SCRIPT_DIR/scripts/lib/config-utils.sh"
+
 # Execute commands by delegating to individual scripts
 case "$COMMAND" in
-    "setup")
-        exec "$SCRIPT_DIR/scripts/setup-github-project.sh" $DRY_RUN_FLAG
-        ;;
-    "setup-complete")
-        exec "$SCRIPT_DIR/scripts/setup-complete-github-project.sh" $DRY_RUN_FLAG
-        ;;
-    "setup-repo")
-        exec "$SCRIPT_DIR/scripts/setup-repo-project.sh" $DRY_RUN_FLAG
-        ;;
-    "setup-simple")
-        exec "$SCRIPT_DIR/scripts/configure-project-fields-simple.sh" $DRY_RUN_FLAG
+    "init")
+        init_config
         ;;
     "configure")
-        exec "$SCRIPT_DIR/scripts/configure-project-fields.sh" $DRY_RUN_FLAG
+        if validate_config; then
+            show_config
+            echo -e "${GREEN}✅ Configuration is valid${NC}"
+        fi
+        ;;
+    "setup-fields")
+        # Validate configuration first
+        if ! validate_config; then
+            echo "❌ Configuration validation failed. Run './gh-pm configure' to fix issues."
+            exit 1
+        fi
+        
+        # Load field utilities
+        source "$SCRIPT_DIR/scripts/lib/field-utils.sh"
+        
+        PROJECT_ID=$(get_project_id)
+        
+        if [[ "$DRY_RUN_FLAG" == "--dry-run" ]]; then
+            echo -e "${CYAN}🔍 DRY-RUN: Would create standard project fields for project: $PROJECT_ID${NC}"
+            echo -e "${CYAN}🔍 DRY-RUN: Would create: Task Type, Risk Level, Effort, Dependencies, Workflow Status${NC}"
+        else
+            echo "🏗️  Creating standard project fields..."
+            create_standard_fields "$PROJECT_ID"
+            update_config_with_field_ids "$PROJECT_ID"
+            echo ""
+            echo -e "${GREEN}✅ Field setup complete!${NC}"
+            echo -e "${BLUE}ℹ️  Run './gh-pm configure' to verify field configuration${NC}"
+        fi
+        ;;
+    "setup")
+        exec "$SCRIPT_DIR/scripts/setup/setup-github-project.sh" $DRY_RUN_FLAG
+        ;;
+    "setup-complete")
+        exec "$SCRIPT_DIR/scripts/setup/setup-complete-github-project.sh" $DRY_RUN_FLAG
+        ;;
+    "setup-repo")
+        exec "$SCRIPT_DIR/scripts/setup/setup-repo-project.sh" $DRY_RUN_FLAG
+        ;;
+    "setup-simple")
+        exec "$SCRIPT_DIR/scripts/setup/configure-project-fields-simple.sh" $DRY_RUN_FLAG
+        ;;
+    "configure")
+        exec "$SCRIPT_DIR/scripts/setup/configure-project-fields.sh" $DRY_RUN_FLAG
         ;;
     "status")
-        exec "$SCRIPT_DIR/scripts/query-project-status.sh"
+        exec "$SCRIPT_DIR/scripts/admin/query-project-status.sh"
         ;;
     "workflow-status")
-        exec "$SCRIPT_DIR/scripts/query-workflow-status.sh"
+        exec "$SCRIPT_DIR/scripts/admin/query-workflow-status.sh"
         ;;
     "start")
         if [[ ${#ARGS[@]} -eq 0 ]]; then
@@ -609,7 +647,7 @@ case "$COMMAND" in
             echo "Usage: gh-pm start <issue> [--dry-run]"
             exit 1
         fi
-        exec "$SCRIPT_DIR/scripts/start-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
+        exec "$SCRIPT_DIR/scripts/workflow/start-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
         ;;
     "workflow-start")
         if [[ ${#ARGS[@]} -eq 0 ]]; then
@@ -617,7 +655,7 @@ case "$COMMAND" in
             echo "Usage: gh-pm workflow-start <issue> [--dry-run]"
             exit 1
         fi
-        exec "$SCRIPT_DIR/scripts/start-workflow-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
+        exec "$SCRIPT_DIR/scripts/workflow/start-workflow-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
         ;;
     "complete")
         if [[ ${#ARGS[@]} -eq 0 ]]; then
@@ -625,7 +663,7 @@ case "$COMMAND" in
             echo "Usage: gh-pm complete <issue> [message] [--dry-run]"
             exit 1
         fi
-        exec "$SCRIPT_DIR/scripts/complete-task.sh" "${ARGS[@]}" $DRY_RUN_FLAG
+        exec "$SCRIPT_DIR/scripts/workflow/complete-task.sh" "${ARGS[@]}" $DRY_RUN_FLAG
         ;;
     "approve")
         if [[ ${#ARGS[@]} -eq 0 ]]; then
@@ -633,7 +671,7 @@ case "$COMMAND" in
             echo "Usage: gh-pm approve <issue> [message] [--dry-run]"
             exit 1
         fi
-        exec "$SCRIPT_DIR/scripts/approve-task.sh" "${ARGS[@]}" $DRY_RUN_FLAG
+        exec "$SCRIPT_DIR/scripts/workflow/approve-task.sh" "${ARGS[@]}" $DRY_RUN_FLAG
         ;;
     "review")
         if [[ ${#ARGS[@]} -eq 0 ]]; then
@@ -641,7 +679,7 @@ case "$COMMAND" in
             echo "Usage: gh-pm review <issue> [--dry-run]"
             exit 1
         fi
-        exec "$SCRIPT_DIR/scripts/review-workflow-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
+        exec "$SCRIPT_DIR/scripts/workflow/review-workflow-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
         ;;
     "rework")
         if [[ ${#ARGS[@]} -lt 2 ]]; then
@@ -649,7 +687,7 @@ case "$COMMAND" in
             echo "Usage: gh-pm rework <issue> <feedback> [--dry-run]"
             exit 1
         fi
-        exec "$SCRIPT_DIR/scripts/request-rework.sh" "${ARGS[@]}" $DRY_RUN_FLAG
+        exec "$SCRIPT_DIR/scripts/workflow/request-rework.sh" "${ARGS[@]}" $DRY_RUN_FLAG
         ;;
     "ready")
         if [[ ${#ARGS[@]} -eq 0 ]]; then

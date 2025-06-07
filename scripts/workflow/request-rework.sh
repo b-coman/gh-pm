@@ -1,12 +1,42 @@
 #!/bin/bash
-# Request rework on a task in Review status (move back to In Progress)
-# Enhanced with dry-run capability
+# @fileoverview Request rework on a task - move from Review back to In Progress
+# @module workflow/request-rework
+#
+# @description
+# Moves a task from "Review" status back to "In Progress" with feedback.
+# Updates both workflow and native status fields. Adds detailed feedback
+# comment to guide the rework process.
+#
+# @dependencies
+# - Scripts: ../lib/security-utils.sh, ../lib/error-utils.sh, ../lib/config-utils.sh, ../lib/dry-run-utils.sh, ../lib/field-utils.sh
+# - Commands: gh, jq
+# - APIs: GitHub GraphQL v4 (updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./request-rework.sh [--dry-run] <issue-number> <feedback-message>
+#
+# @options
+# --dry-run    Preview changes without executing
+#
+# @example
+# ./request-rework.sh 42 "Please add error handling for edge cases"
+# ./request-rework.sh --dry-run 42 "Test feedback"
 
-set -e
+set -eo pipefail
 
-# Load shared dry-run utilities
+# Load utilities in dependency order
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/error-utils.sh"
+source "$SCRIPT_DIR/../lib/security-utils.sh"
+source "$SCRIPT_DIR/../lib/config-utils.sh"
+source "$SCRIPT_DIR/../lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/field-utils.sh"
+
+# Setup error handling
+setup_error_handling
+
+# Validate authentication first
+validate_github_auth || exit $ERR_AUTH
 
 # Parse arguments and initialize dry-run mode
 init_dry_run "$@"
@@ -21,24 +51,35 @@ done
 
 # Validate arguments
 if ! validate_dry_run_args "$0" 2 "${ARGS[@]}"; then
-    print_dry_run_usage "$0" "<issue-number> <feedback-message>" "39 'Please add error handling'"
-    exit 1
+    print_dry_run_usage "$0" "<issue-number> <feedback-message>" "42 'Please add error handling'"
+    exit $ERR_INVALID_INPUT
 fi
 
 ISSUE_NUMBER="${ARGS[0]}"
 FEEDBACK_MESSAGE="${ARGS[1]}"
 
-# Load project info
-if [ ! -f "project-info.json" ]; then
-    echo "❌ project-info.json not found. Run setup script first."
-    exit 1
+# Validate and sanitize inputs
+validate_issue_number "$ISSUE_NUMBER" || exit $ERR_INVALID_INPUT
+FEEDBACK_MESSAGE=$(sanitize_text_input "$FEEDBACK_MESSAGE" 1000)  # Allow more text for feedback
+
+# Validate configuration
+if ! validate_config; then
+    echo "❌ Configuration validation failed. Run './gh-pm configure' to fix issues."
+    exit $ERR_CONFIG
 fi
 
-PROJECT_ID=$(jq -r '.project_id' project-info.json)
-WORKFLOW_STATUS_FIELD_ID=$(jq -r '.workflow_status_field_id' project-info.json)
-IN_PROGRESS_OPTION_ID=$(jq -r '.in_progress_option_id' project-info.json)
-STATUS_FIELD_ID=$(jq -r '.status_field_id' project-info.json)
-NATIVE_IN_PROGRESS_ID="47fc9ee4"  # Built-in "In Progress" option ID
+# Load configuration values
+PROJECT_ID=$(get_project_id)
+GITHUB_OWNER=$(get_github_owner)
+GITHUB_REPO=$(get_github_repo)
+
+# Validate loaded configuration
+validate_project_id "$PROJECT_ID" || exit $ERR_CONFIG
+validate_github_username "$GITHUB_OWNER" || exit $ERR_CONFIG
+WORKFLOW_STATUS_FIELD_ID=$(get_field_id_dynamic "workflow_status")
+STATUS_FIELD_ID=$(get_field_id_dynamic "status")
+IN_PROGRESS_OPTION_ID=$(get_field_option_id_dynamic "workflow_status" "In Progress")
+NATIVE_IN_PROGRESS_ID=$(get_field_option_id_dynamic "status" "In Progress")
 
 print_dry_run_header "🔄 Requesting Rework for Task #$ISSUE_NUMBER"
 
@@ -54,7 +95,7 @@ if is_dry_run; then
 else
     ISSUE_DATA=$(gh api graphql -f query='
       query {
-        repository(owner: "b-coman", name: "prop-management") {
+        repository(owner: "'$GITHUB_OWNER'", name: "'$GITHUB_REPO'") {
           issue(number: '$ISSUE_NUMBER') {
             id
             title

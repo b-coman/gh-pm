@@ -1,0 +1,64 @@
+# gh-pm gitignore
+
+# Configuration files with sensitive data
+config.json
+.env
+.env.local
+
+# Test artifacts
+tests/test-results/
+tests/coverage/
+*.log
+*.tmp
+
+# Temporary files
+/tmp/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Debug files
+debug/
+.debug/
+
+# Local development
+local/
+.local/
+
+# Generated documentation
+docs/generated/
+
+# Node modules (if any JS tooling added)
+node_modules/
+
+# Python (if any Python tooling added)  
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Coverage reports
+coverage/
+.coverage
+htmlcov/
+
+# OS generated files
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# gh-pm specific
+/scripts/test-*.sh
+!tests/**/*.sh
+project-info.json
+gh-pm-error.log

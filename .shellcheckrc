@@ -1,0 +1,14 @@
+# ShellCheck configuration for gh-pm
+
+# Disable specific warnings that don't apply to our use case
+disable=SC2034  # Variable appears unused (often used in sourced files)
+
+# Enable additional checks
+enable=quote-safe-variables
+enable=check-unassigned-uppercase
+
+# Set shell
+shell=bash
+
+# External sources (files we source but shellcheck can't find)
+external-sources=true

@@ -7,10 +7,19 @@ set -e
 
 # Load shared dry-run utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/dry-run-utils.sh"
+
+# Load configuration utilities
+source "$SCRIPT_DIR/../lib/config-utils.sh"
+
+# Load security utilities
+source "$SCRIPT_DIR/../lib/security-utils.sh"
 
 # Parse arguments and initialize dry-run mode
 init_dry_run "$@"
+
+# Validate authentication
+validate_github_auth || exit 1
 
 # Extract non-dry-run arguments
 ARGS=()
@@ -27,6 +36,9 @@ if ! validate_dry_run_args "$0" 1 "${ARGS[@]}"; then
 fi
 
 ISSUE_NUMBER="${ARGS[0]}"
+
+# Validate issue number
+validate_issue_number "$ISSUE_NUMBER" || exit 1
 APPROVAL_MESSAGE="${ARGS[1]:-Excellent implementation, meets all requirements}"
 
 # Load project info
@@ -151,7 +163,7 @@ echo "🔧 Next steps:"
 echo "   📊 Check progress: ./query-project-status.sh"
 echo "   🔗 Check dependencies: ./check-dependencies.sh"  
 echo "   🔵 Move ready tasks: ./move-to-ready.sh [issue]"
-echo "   🔗 View project: https://github.com/users/b-coman/projects/3"
+echo "   🔗 View project: $(get_project_url)"
 
 if is_dry_run; then
     echo ""

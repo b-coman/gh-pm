@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Master Setup Script for Property Renderer Consolidation GitHub Project
+# Master Setup Script for GitHub Project
 # This script orchestrates the complete project setup process
 
 set -e
@@ -35,7 +35,7 @@ print_info() {
     echo -e "${CYAN}ℹ️  $1${NC}"
 }
 
-print_dry_run_header "GitHub Project Setup for Property Renderer Consolidation"
+print_dry_run_header "Complete GitHub Project Setup"
 
 print_info "This script will:"
 print_info "  1. Verify GitHub CLI authentication and permissions"
@@ -245,7 +245,7 @@ if [ -f "$SCRIPT_DIR/project-info.json" ]; then
     print_header "Next: Visit Your Project!"
     print_info "🌐 Open: $PROJECT_URL"
     print_info "📚 Documentation: /docs/guides/architectural-migration-methodology.md"
-    print_info "🎯 Milestone: Property Renderer Consolidation (Due: Jan 15, 2025)"
+    print_info "🎯 Setting up comprehensive project management workflow"
     
 else
     print_error "project-info.json not found. Setup may have failed."

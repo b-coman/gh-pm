@@ -1,21 +1,50 @@
 #!/bin/bash
-# Start a workflow task by moving it to "In Progress" status
+# @fileoverview Start a workflow task by moving it from Ready to In Progress
+# @module workflow/start-workflow-task
+#
+# @description
+# Validates task status and dependencies, then moves a task from "Ready" to
+# "In Progress" status. Updates both workflow and native status fields.
+# Ensures only one task is active at a time.
+#
+# @dependencies
+# - Scripts: ../lib/security-utils.sh, ../lib/error-utils.sh, ../lib/config-utils.sh, ../lib/dry-run-utils.sh, ../lib/field-utils.sh
+# - Commands: gh, jq
+# - APIs: GitHub GraphQL v4 (updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./start-workflow-task.sh [--dry-run] <issue-number>
+#
+# @options
+# --dry-run    Preview changes without executing
+#
+# @example
+# ./start-workflow-task.sh 42
+# ./start-workflow-task.sh --dry-run 42
 
-set -e
+set -eo pipefail
 
-# Get script directory for relative imports
+# Load utilities in dependency order
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/error-utils.sh"
+source "$SCRIPT_DIR/../lib/security-utils.sh"
+source "$SCRIPT_DIR/../lib/config-utils.sh"
+source "$SCRIPT_DIR/../lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/field-utils.sh"
 
-# Load shared dry-run utilities
-source "$SCRIPT_DIR/lib/dry-run-utils.sh"
+# Setup error handling
+setup_error_handling
+
+# Validate authentication first
+validate_github_auth || exit $ERR_AUTH
 
 # Initialize dry-run mode
 init_dry_run "$@"
 
 # Validate arguments (filter out --dry-run)
 if ! validate_dry_run_args "$(basename "$0")" 1 "$@"; then
-    print_dry_run_usage "$(basename "$0")" "<issue-number>" "39"
-    exit 1
+    print_dry_run_usage "$(basename "$0")" "<issue-number>" "42"
+    exit $ERR_INVALID_INPUT
 fi
 
 # Extract issue number (filtering out --dry-run)
@@ -28,16 +57,27 @@ done
 
 ISSUE_NUMBER=${FILTERED_ARGS[0]}
 
-# Load project info
-if [ ! -f "project-info.json" ]; then
-    echo "❌ project-info.json not found. Run setup script first."
-    exit 1
+# Validate issue number
+validate_issue_number "$ISSUE_NUMBER" || exit $ERR_INVALID_INPUT
+
+# Validate configuration
+if ! validate_config; then
+    echo "❌ Configuration validation failed. Run './gh-pm configure' to fix issues."
+    exit $ERR_CONFIG
 fi
 
-PROJECT_ID=$(jq -r '.project_id' project-info.json)
-WORKFLOW_STATUS_FIELD_ID=$(jq -r '.workflow_status_field_id' project-info.json)
-IN_PROGRESS_OPTION_ID=$(jq -r '.in_progress_option_id' project-info.json)
-READY_OPTION_ID=$(jq -r '.ready_option_id' project-info.json)
+# Load configuration values
+PROJECT_ID=$(get_project_id)
+GITHUB_OWNER=$(get_github_owner)
+GITHUB_REPO=$(get_github_repo)
+
+# Validate loaded configuration
+validate_project_id "$PROJECT_ID" || exit $ERR_CONFIG
+validate_github_username "$GITHUB_OWNER" || exit $ERR_CONFIG
+WORKFLOW_STATUS_FIELD_ID=$(get_field_id_dynamic "workflow_status")
+STATUS_FIELD_ID=$(get_field_id_dynamic "status")
+IN_PROGRESS_OPTION_ID=$(get_field_option_id_dynamic "workflow_status" "In Progress")
+NATIVE_IN_PROGRESS_ID=$(get_field_option_id_dynamic "status" "In Progress")
 
 echo -e "${BLUE}🚀 Starting Task #$ISSUE_NUMBER${NC}"
 echo ""
@@ -51,44 +91,58 @@ if is_dry_run; then
     ISSUE_TITLE="Mock Issue for Dry Run #$ISSUE_NUMBER"
     ISSUE_BODY="Mock issue body for demonstration purposes"
 else
-    ISSUE_DATA=$(gh api graphql -f query='
-      query {
-        repository(owner: "b-coman", name: "prop-management") {
-          issue(number: '$ISSUE_NUMBER') {
-            id
-            title
-            body
-            projectItems(first: 10) {
-              nodes {
-                id
-                fieldValues(first: 20) {
-                  nodes {
-                    ... on ProjectV2ItemFieldSingleSelectValue {
-                      name
-                      optionId
-                      field {
-                        ... on ProjectV2SingleSelectField {
-                          id
-                          name
+    # Build secure GraphQL query using jq (prevents injection)
+    QUERY=$(jq -n \
+        --arg owner "$(safe_graphql_string "$GITHUB_OWNER")" \
+        --arg repo "$(safe_graphql_string "$GITHUB_REPO")" \
+        --argjson issue "$ISSUE_NUMBER" \
+        '{
+            query: "query GetIssue($owner: String!, $repo: String!, $issue: Int!) {
+                repository(owner: $owner, name: $repo) {
+                    issue(number: $issue) {
+                        id
+                        title
+                        body
+                        projectItems(first: 10) {
+                            nodes {
+                                id
+                                fieldValues(first: 20) {
+                                    nodes {
+                                        ... on ProjectV2ItemFieldSingleSelectValue {
+                                            name
+                                            optionId
+                                            field {
+                                                ... on ProjectV2SingleSelectField {
+                                                    id
+                                                    name
+                                                }
+                                            }
+                                        }
+                                        ... on ProjectV2ItemFieldTextValue {
+                                            text
+                                            field {
+                                                ... on ProjectV2Field {
+                                                    id
+                                                    name
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
-                      }
                     }
-                    ... on ProjectV2ItemFieldTextValue {
-                      text
-                      field {
-                        ... on ProjectV2Field {
-                          id
-                          name
-                        }
-                      }
-                    }
-                  }
                 }
-              }
+            }",
+            variables: {
+                owner: $owner,
+                repo: $repo,
+                issue: $issue
             }
-          }
-        }
-      }')
+        }')
+    
+    # Execute query with retry logic
+    ISSUE_DATA=$(retry_with_backoff 3 2 gh api graphql --input - <<< "$QUERY")
     
     ISSUE_TITLE=$(echo $ISSUE_DATA | jq -r '.data.repository.issue.title')
     ISSUE_BODY=$(echo $ISSUE_DATA | jq -r '.data.repository.issue.body')
@@ -202,8 +256,6 @@ WORKFLOW_MUTATION='
 execute_mutation "$WORKFLOW_MUTATION" "Update Workflow Status to In Progress"
 
 # Also update native Status field to In Progress
-STATUS_FIELD_ID=$(jq -r '.status_field_id' project-info.json)
-NATIVE_IN_PROGRESS_ID="47fc9ee4"  # This is the built-in "In Progress" option ID
 
 echo -e "${YELLOW}🔄 Syncing native Status field...${NC}"
 
@@ -256,4 +308,4 @@ echo ""
 echo -e "${BLUE}🛠️ Available Commands:${NC}"
 echo "   📊 ./scripts/query-workflow-status.sh - Check project status"
 echo "   ✅ ./scripts/complete-workflow-task.sh $ISSUE_NUMBER - Mark task complete"
-echo "   📋 Visit project: $(jq -r '.project_url' project-info.json)"
+echo "   📋 Visit project: $(get_config "project.url")"

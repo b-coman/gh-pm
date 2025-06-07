@@ -1,13 +1,38 @@
 #!/bin/bash
+# @fileoverview Move issue to Ready status
+# @module workflow/move-to-ready
+#
+# @description
+# Moves a task to "Ready" status, indicating it's available to be started.
+# Validates dependencies are met before marking as ready.
+#
+# @dependencies
+# - Scripts: ../lib/security-utils.sh, ../lib/error-utils.sh, ../lib/config-utils.sh, ../lib/dry-run-utils.sh, ../lib/field-utils.sh
+# - Commands: gh, jq
+# - APIs: GitHub GraphQL v4 (updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./move-to-ready.sh [--dry-run] <issue-number>
+#
+# @options
+# --dry-run    Preview changes without executing
+#
+# @example
+# ./move-to-ready.sh 42
+# ./move-to-ready.sh --dry-run 42
 
-# Move a specific task to Ready status (for unblocking dependent tasks)
-# Enhanced with dry-run capability
+set -eo pipefail
 
-set -e
-
-# Load shared dry-run utilities
+# Load utilities in dependency order
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/error-utils.sh"
+source "$SCRIPT_DIR/../lib/security-utils.sh"
+source "$SCRIPT_DIR/../lib/config-utils.sh"
+source "$SCRIPT_DIR/../lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/field-utils.sh"
+
+# Setup error handling
+setup_error_handling
 
 # Parse arguments and initialize dry-run mode
 init_dry_run "$@"
@@ -28,15 +53,18 @@ fi
 
 ISSUE_NUMBER="${ARGS[0]}"
 
-# Load project info
-if [ ! -f "project-info.json" ]; then
-    echo "❌ project-info.json not found. Run setup-github-project.sh first."
+# Validate configuration
+if ! validate_config; then
+    echo "❌ Configuration validation failed. Run './gh-pm configure' to fix issues."
     exit 1
 fi
 
-PROJECT_ID=$(jq -r '.project_id' project-info.json)
-STATUS_FIELD_ID=$(jq -r '.status_field_id' project-info.json)
-READY_OPTION_ID=$(jq -r '.ready_option_id' project-info.json)
+# Load configuration values
+PROJECT_ID=$(get_project_id)
+GITHUB_OWNER=$(get_github_owner)
+GITHUB_REPO=$(get_github_repo)
+STATUS_FIELD_ID=$(get_field_id_dynamic "status")
+READY_OPTION_ID=$(get_field_option_id_dynamic "status" "Todo")  # Ready maps to Todo in native status
 
 print_dry_run_header "Moving Task #$ISSUE_NUMBER to Ready"
 
@@ -56,7 +84,7 @@ if is_dry_run; then
 else
     ISSUE_DATA=$(gh api graphql -f query='
       query {
-        repository(owner: "b-coman", name: "prop-management") {
+        repository(owner: "'$GITHUB_OWNER'", name: "'$GITHUB_REPO'") {
           issue(number: '$ISSUE_NUMBER') {
             title
             state
@@ -142,7 +170,7 @@ if [[ "$DEPENDENCIES" == *"Blocked by"* ]]; then
                 # Check if blocking issue is completed
                 BLOCKING_STATUS=$(gh api graphql -f query='
                   query {
-                    repository(owner: "b-coman", name: "prop-management") {
+                    repository(owner: "'$GITHUB_OWNER'", name: "'$GITHUB_REPO'") {
                       issue(number: '$blocking_issue') {
                         state
                         projectItems(first: 10) {

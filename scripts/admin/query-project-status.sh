@@ -4,6 +4,15 @@
 
 set -e
 
+# Get script directory for relative imports
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration utilities
+source "$SCRIPT_DIR/lib/config-utils.sh"
+
+# Load security utilities
+source "$SCRIPT_DIR/lib/security-utils.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -40,7 +49,7 @@ fi
 PROJECT_ID=$(jq -r '.project_id' project-info.json)
 PROJECT_URL=$(jq -r '.project_url' project-info.json)
 
-print_header "Property Renderer Consolidation - Project Status"
+print_header "$(get_config "project.title") - Project Status"
 
 echo -e "${CYAN}📊 Project: $PROJECT_URL${NC}"
 echo -e "${CYAN}🆔 Project ID: $PROJECT_ID${NC}"

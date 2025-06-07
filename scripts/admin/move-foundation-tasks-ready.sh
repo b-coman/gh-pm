@@ -10,16 +10,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Load shared dry-run utilities
 source "$SCRIPT_DIR/lib/dry-run-utils.sh"
 
+# Load configuration utilities
+source "$SCRIPT_DIR/lib/config-utils.sh"
+
 # Initialize dry-run mode
 init_dry_run "$@"
 
-# Load project info
-if [ ! -f "project-info.json" ]; then
-    echo "❌ project-info.json not found. Run setup-github-project.sh first."
+# Validate configuration
+if ! validate_config; then
+    echo "❌ Configuration validation failed. Run './gh-pm configure' to fix issues."
     exit 1
 fi
 
-PROJECT_ID=$(jq -r '.project_id' project-info.json)
+# Load configuration values
+PROJECT_ID=$(get_project_id)
+GITHUB_OWNER=$(get_github_owner)
+GITHUB_REPO=$(get_github_repo)
 
 print_dry_run_header "Moving Foundation Tasks to Ready Status"
 
@@ -58,6 +64,15 @@ else
     # Extract Status field ID and Ready option ID
     STATUS_FIELD_ID=$(echo "$FIELDS_DATA" | jq -r '.data.node.fields.nodes[] | select(.name == "Status") | .id')
     READY_OPTION_ID=$(echo "$FIELDS_DATA" | jq -r '.data.node.fields.nodes[] | select(.name == "Status") | .options[] | select(.name == "Ready") | .id')
+    
+    # If not found, try dynamic lookup
+    if [[ "$STATUS_FIELD_ID" == "null" || -z "$STATUS_FIELD_ID" ]]; then
+        STATUS_FIELD_ID=$(get_field_id_dynamic "status")
+    fi
+    
+    if [[ "$READY_OPTION_ID" == "null" || -z "$READY_OPTION_ID" ]]; then
+        READY_OPTION_ID=$(get_field_option_id_dynamic "status" "Ready")
+    fi
 fi
 
 if [ "$STATUS_FIELD_ID" = "null" ] || [ -z "$STATUS_FIELD_ID" ]; then
@@ -79,8 +94,8 @@ echo "✅ Status field found: $STATUS_FIELD_ID"
 echo "✅ Ready option found: $READY_OPTION_ID"
 echo ""
 
-# Foundation tasks to move
-FOUNDATION_ISSUES=(39 40 41)
+# Foundation tasks to move (from configuration)
+FOUNDATION_ISSUES=($(get_config "workflow.foundation_issues[]" | tr -d '[]," '))
 
 echo "🚀 Moving foundation tasks to Ready status..."
 echo ""
@@ -96,7 +111,7 @@ for issue_number in "${FOUNDATION_ISSUES[@]}"; do
         # Get project item ID for this issue
         ITEM_DATA=$(gh api graphql -f query='
           query {
-            repository(owner: "b-coman", name: "prop-management") {
+            repository(owner: "'$GITHUB_OWNER'", name: "'$GITHUB_REPO'") {
               issue(number: '$issue_number') {
                 title
                 projectItems(first: 10) {
@@ -160,29 +175,41 @@ for issue_number in "${FOUNDATION_ISSUES[@]}"; do
 done
 
 if is_dry_run; then
-    print_dry_run_summary "Move Foundation Tasks to Ready" "39, 40, 41" "Change status from 'Todo' to 'Ready' for foundation tasks"
+    ISSUE_LIST=$(printf "%s, " "${FOUNDATION_ISSUES[@]}")
+    ISSUE_LIST=${ISSUE_LIST%, }  # Remove trailing comma
+    print_dry_run_summary "Move Foundation Tasks to Ready" "$ISSUE_LIST" "Change status from 'Todo' to 'Ready' for foundation tasks"
     echo ""
 fi
 
 print_header "✅ Foundation Tasks Ready!"
 
 if is_dry_run; then
-    echo -e "${GREEN}🎉 Foundation tasks would be ready for development:${NC}"
+    echo -e "${GREEN}🎉 Foundation tasks would be ready for development${NC}"
 else
-    echo -e "${GREEN}🎉 Foundation tasks are now ready for development:${NC}"
+    echo -e "${GREEN}🎉 Foundation tasks are now ready for development${NC}"
+fi
+
+if [ ${#FOUNDATION_ISSUES[@]} -gt 0 ]; then
+    echo ""
+    echo -e "${BLUE}📋 Processed issues: ${FOUNDATION_ISSUES[*]}${NC}"
+else
+    echo ""
+    echo -e "${YELLOW}ℹ️  No foundation issues configured. Update 'workflow.foundation_issues' in config.json${NC}"
 fi
 echo ""
-echo "   📋 #39 - Create data transformation utilities"
-echo "   📋 #40 - Audit and map component functionality gaps"  
-echo "   📋 #41 - Document booking form integration differences"
-echo ""
 echo -e "${BLUE}🔧 Next Steps:${NC}"
-echo "   1. Start working on any foundation task: ./start-task.sh [39|40|41]"
-echo "   2. Check project status: ./query-project-status.sh"
-echo "   3. View project board: $(jq -r '.project_url' project-info.json)"
+if [ ${#FOUNDATION_ISSUES[@]} -gt 0 ]; then
+    ISSUE_EXAMPLES=$(printf "%s|" "${FOUNDATION_ISSUES[@]}")
+    ISSUE_EXAMPLES=${ISSUE_EXAMPLES%|}  # Remove trailing pipe
+    echo "   1. Start working on any foundation task: ./gh-pm start [${ISSUE_EXAMPLES}]"
+else
+    echo "   1. Configure foundation issues in config.json"
+fi
+echo "   2. Check project status: ./gh-pm status"
+echo "   3. View project board: $(get_project_url)"
 echo ""
-echo -e "${PURPLE}🔒 Blocked Tasks:${NC}"
-echo "   Enhancement tasks (#42, #43, #44) remain blocked until foundation complete"
-echo "   Migration tasks (#45, #46) remain blocked until enhancements complete"
+echo -e "${PURPLE}🔒 Dependency Information:${NC}"
+echo "   Other tasks may remain blocked until foundation tasks are complete"
+echo "   Check dependencies with: ./gh-pm dependencies"
 echo ""
-echo "🚀 Ready to start the renderer consolidation!"
+echo "🚀 Ready to start development!"

@@ -26,7 +26,7 @@ init_dry_run() {
     done
     
     # Check environment variable
-    if [[ "${DRY_RUN_MODE}" == "true" ]]; then
+    if [[ "${DRY_RUN_MODE:-false}" == "true" ]]; then
         DRY_RUN=true
     fi
     
@@ -129,8 +129,8 @@ generate_mock_dependencies() {
 # Safe issue verification with mocking
 verify_issue_safe() {
     local issue_number="$1"
-    local repo_owner="${2:-b-coman}"
-    local repo_name="${3:-prop-management}"
+    local repo_owner="${2:-MOCK_OWNER}"
+    local repo_name="${3:-MOCK_REPO}"
     
     if is_dry_run; then
         echo -e "${CYAN}🔍 DRY-RUN: Mocking issue check for demonstration${NC}"

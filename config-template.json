@@ -1,0 +1,59 @@
+{
+  "_comment": "gh-pm Configuration Template - Copy to config.json and customize",
+  "github": {
+    "owner": "YOUR_GITHUB_USERNAME",
+    "repository": "YOUR_REPOSITORY_NAME",
+    "user_id": "YOUR_GITHUB_USER_ID"
+  },
+  "project": {
+    "id": "YOUR_PROJECT_ID",
+    "url": "https://github.com/users/YOUR_USERNAME/projects/N",
+    "number": "PROJECT_NUMBER",
+    "title": "Your Project Title"
+  },
+  "fields": {
+    "task_type": {
+      "id": "TASK_TYPE_FIELD_ID",
+      "options": {
+        "foundation": "🔍 Foundation",
+        "enhancement": "⚡ Enhancement",
+        "bug": "🐛 Bug Fix",
+        "documentation": "📚 Documentation"
+      }
+    },
+    "risk_level": {
+      "id": "RISK_LEVEL_FIELD_ID", 
+      "options": {
+        "low": "🟢 Low",
+        "medium": "🟡 Medium", 
+        "high": "🔴 High",
+        "critical": "🚨 Critical"
+      }
+    },
+    "effort": {
+      "id": "EFFORT_FIELD_ID",
+      "options": {
+        "small": "🟦 Small",
+        "medium": "🟨 Medium",
+        "large": "🟥 Large"
+      }
+    },
+    "status": {
+      "id": "STATUS_FIELD_ID",
+      "options": {
+        "todo": "Todo",
+        "ready": "Ready", 
+        "in_progress": "In Progress",
+        "review": "Review",
+        "done": "Done"
+      }
+    },
+    "dependencies": {
+      "id": "DEPENDENCIES_FIELD_ID"
+    }
+  },
+  "workflow": {
+    "foundation_issues": [],
+    "initial_setup_complete": false
+  }
+}

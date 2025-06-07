@@ -1,13 +1,42 @@
 #!/bin/bash
+# @fileoverview Complete a task by moving it to Done status and checking dependencies
+# @module workflow/complete-task
+#
+# @description
+# Moves a task to "Done" status in both workflow and native status fields.
+# Automatically checks for dependent tasks and notifies about newly available work.
+# Adds completion comment to the issue.
+#
+# @dependencies
+# - Scripts: ../lib/security-utils.sh, ../lib/error-utils.sh, ../lib/config-utils.sh, ../lib/dry-run-utils.sh, ../lib/field-utils.sh
+# - Commands: gh, jq
+# - APIs: GitHub GraphQL v4 (updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./complete-task.sh [--dry-run] <issue-number> [completion-message]
+#
+# @options
+# --dry-run    Preview changes without executing
+#
+# @example
+# ./complete-task.sh 42 "Feature implementation completed"
+# ./complete-task.sh --dry-run 42
 
-# Complete a task by moving it to "Done" status and checking dependent tasks
-# Enhanced with dry-run capability
+set -eo pipefail
 
-set -e
-
-# Load shared dry-run utilities
+# Load utilities in dependency order
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/error-utils.sh"
+source "$SCRIPT_DIR/../lib/security-utils.sh"
+source "$SCRIPT_DIR/../lib/config-utils.sh"
+source "$SCRIPT_DIR/../lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/field-utils.sh"
+
+# Setup error handling
+setup_error_handling
+
+# Validate authentication first
+validate_github_auth || exit $ERR_AUTH
 
 # Parse arguments and initialize dry-run mode
 init_dry_run "$@"
@@ -23,23 +52,35 @@ done
 # Validate arguments
 if ! validate_dry_run_args "$0" 1 "${ARGS[@]}"; then
     print_dry_run_usage "$0" "<issue_number> [completion_comment]"
-    exit 1
+    exit $ERR_INVALID_INPUT
 fi
 
 ISSUE_NUMBER="${ARGS[0]}"
 COMPLETION_COMMENT="${ARGS[1]:-Task completed via automation}"
 
-# Load project info
-if [ ! -f "project-info.json" ]; then
-    echo "❌ project-info.json not found. Run setup-github-project.sh first."
-    exit 1
+# Validate and sanitize inputs
+validate_issue_number "$ISSUE_NUMBER" || exit $ERR_INVALID_INPUT
+COMPLETION_COMMENT=$(sanitize_text_input "$COMPLETION_COMMENT" 500)
+
+# Validate configuration
+if ! validate_config; then
+    echo "❌ Configuration validation failed. Run './gh-pm configure' to fix issues."
+    exit $ERR_CONFIG
 fi
 
-PROJECT_ID=$(jq -r '.project_id' project-info.json)
-STATUS_FIELD_ID=$(jq -r '.status_field_id' project-info.json)
-DONE_OPTION_ID=$(jq -r '.done_option_id' project-info.json)
-WORKFLOW_STATUS_FIELD_ID=$(jq -r '.workflow_status_field_id' project-info.json)
-WORKFLOW_DONE_OPTION_ID=$(jq -r '.workflow_done_option_id // "b91fe25d"' project-info.json)
+# Load configuration values
+PROJECT_ID=$(get_project_id)
+GITHUB_OWNER=$(get_github_owner)
+GITHUB_REPO=$(get_github_repo)
+
+# Validate loaded configuration
+validate_project_id "$PROJECT_ID" || exit $ERR_CONFIG
+validate_github_username "$GITHUB_OWNER" || exit $ERR_CONFIG
+STATUS_FIELD_ID=$(get_field_id_dynamic "status")
+WORKFLOW_STATUS_FIELD_ID=$(get_field_id_dynamic "workflow_status")
+DONE_OPTION_ID=$(get_field_option_id_dynamic "workflow_status" "Done")
+NATIVE_DONE_ID=$(get_field_option_id_dynamic "status" "Done")
+WORKFLOW_DONE_OPTION_ID="$DONE_OPTION_ID"  # Alias for consistency
 
 print_dry_run_header "Completing Task #$ISSUE_NUMBER"
 
@@ -64,7 +105,7 @@ else
     
     PROJECT_ITEM_QUERY='
       query {
-        repository(owner: "b-coman", name: "prop-management") {
+        repository(owner: "'$GITHUB_OWNER'", name: "'$GITHUB_REPO'") {
           issue(number: '$ISSUE_NUMBER') {
             projectItems(first: 10) {
               nodes {
@@ -199,7 +240,7 @@ else
     # Check for dependent tasks
     DEPENDENCY_QUERY='
       query {
-        repository(owner: "b-coman", name: "prop-management") {
+        repository(owner: "'$GITHUB_OWNER'", name: "'$GITHUB_REPO'") {
           issues(first: 100, states: OPEN) {
             nodes {
               number
@@ -245,10 +286,10 @@ fi
 
 echo ""
 echo "🔧 Next steps:"
-echo "   📊 Check progress: ./query-project-status.sh"
-echo "   🔗 Check dependencies: ./check-dependencies.sh"
-echo "   🔵 Move ready tasks: ./move-to-ready.sh [issue]"
-echo "   🔗 View project: https://github.com/users/b-coman/projects/3"
+echo "   📊 Check progress: ./gh-pm status"
+echo "   🔗 Check dependencies: ./gh-pm dependencies"
+echo "   🔵 Move ready tasks: ./gh-pm ready [issue]"
+echo "   🔗 View project: $(get_project_url)"
 
 if is_dry_run; then
     echo ""

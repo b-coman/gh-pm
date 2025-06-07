@@ -29,7 +29,7 @@ PROJECT_ID=$(jq -r '.project_id' project-info.json)
 PROJECT_URL=$(jq -r '.project_url' project-info.json)
 WORKFLOW_STATUS_FIELD_ID=$(jq -r '.workflow_status_field_id' project-info.json)
 
-print_header "Property Renderer Consolidation - Workflow Status"
+print_header "Project Workflow Status"
 
 echo -e "${CYAN}📊 Project: $PROJECT_URL${NC}"
 echo -e "${CYAN}🆔 Project ID: $PROJECT_ID${NC}"
@@ -95,6 +95,9 @@ BACKLOG_TASKS=""
 echo "$PROJECT_DATA" | jq -r '.data.node.items.nodes[] | @base64' | while read item; do
     ITEM_DATA=$(echo $item | base64 --decode)
     ISSUE_NUMBER=$(echo $ITEM_DATA | jq -r '.content.number')
+
+# Validate issue number
+validate_issue_number "$ISSUE_NUMBER" || exit 1
     ISSUE_TITLE=$(echo $ITEM_DATA | jq -r '.content.title')
     
     # Get workflow status

@@ -1,29 +1,48 @@
 #!/bin/bash
+# @fileoverview Start a task by moving it to In Progress status (simple version)
+# @module workflow/start-task
+#
+# @description
+# Simple version of task starter that moves a task to "In Progress" status.
+# For advanced workflow with dependency checking, use start-workflow-task.sh instead.
+#
+# @dependencies
+# - Scripts: ../lib/security-utils.sh, ../lib/error-utils.sh, ../lib/config-utils.sh, ../lib/dry-run-utils.sh, ../lib/field-utils.sh
+# - Commands: gh, jq
+# - APIs: GitHub GraphQL v4 (updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./start-task.sh [--dry-run] <issue-number>
+#
+# @options
+# --dry-run    Preview changes without executing
+#
+# @example
+# ./start-task.sh 42
+# ./start-task.sh --dry-run 42
 
-# Start a task by moving it to "In Progress" status
-# Enhanced with dry-run capability
+set -eo pipefail
 
-set -e
+# Load utilities in dependency order
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/error-utils.sh"
+source "$SCRIPT_DIR/../lib/security-utils.sh"
+source "$SCRIPT_DIR/../lib/config-utils.sh"
+source "$SCRIPT_DIR/../lib/dry-run-utils.sh"
+source "$SCRIPT_DIR/../lib/field-utils.sh"
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Setup error handling
+setup_error_handling
 
-# Dry-run mode detection
-DRY_RUN=false
+# Initialize dry-run mode
+init_dry_run "$@"
+
+# Parse issue number from arguments
 ISSUE_NUMBER=""
-
-# Parse arguments
 for arg in "$@"; do
     case $arg in
         --dry-run)
-            DRY_RUN=true
-            shift
+            # Skip dry-run flag
             ;;
         *)
             if [[ -z "$ISSUE_NUMBER" ]]; then
@@ -33,66 +52,26 @@ for arg in "$@"; do
     esac
 done
 
-# Check if DRY_RUN_MODE environment variable is set
-if [[ "${DRY_RUN_MODE}" == "true" ]]; then
-    DRY_RUN=true
-fi
-
 if [ -z "$ISSUE_NUMBER" ]; then
-    echo "❌ Usage: $0 <issue_number> [--dry-run]"
-    echo "   Example: $0 39"
-    echo "   Example: $0 39 --dry-run"
-    echo "   Example: DRY_RUN_MODE=true $0 39"
+    print_dry_run_usage "$0" "<issue_number>" "39"
     exit 1
 fi
 
-print_header() {
-    echo -e "${PURPLE}================================${NC}"
-    echo -e "${PURPLE}$1${NC}"
-    echo -e "${PURPLE}================================${NC}"
-    echo ""
-}
-
-# Safe GitHub API wrapper for dry-run
-gh_api_safe() {
-    if [[ "$DRY_RUN" == "true" ]]; then
-        echo -e "${CYAN}🔍 DRY-RUN: Would execute: gh api $@${NC}"
-        echo -e "${CYAN}   Command: gh api $*${NC}"
-        return 0
-    else
-        gh api "$@"
-    fi
-}
-
-# Safe GraphQL mutation execution
-execute_mutation() {
-    local mutation="$1"
-    if [[ "$DRY_RUN" == "true" ]]; then
-        echo -e "${CYAN}🔍 DRY-RUN: Would execute GraphQL mutation:${NC}"
-        echo -e "${CYAN}   $mutation${NC}"
-        echo -e "${CYAN}   This would update the task status to 'In Progress'${NC}"
-        return 0
-    else
-        gh api graphql -f query="$mutation"
-    fi
-}
-
-# Load project info
-if [ ! -f "project-info.json" ]; then
-    echo "❌ project-info.json not found. Run setup-github-project.sh first."
+# Validate configuration
+if ! validate_config; then
+    echo "❌ Configuration validation failed. Run './gh-pm configure' to fix issues."
     exit 1
 fi
 
-PROJECT_ID=$(jq -r '.project_id' project-info.json)
-STATUS_FIELD_ID=$(jq -r '.status_field_id' project-info.json)
-IN_PROGRESS_OPTION_ID=$(jq -r '.in_progress_option_id' project-info.json)
+# Load configuration values
+PROJECT_ID=$(get_project_id)
+GITHUB_OWNER=$(get_github_owner)
+GITHUB_REPO=$(get_github_repo)
+STATUS_FIELD_ID=$(get_field_id_dynamic "status")
+IN_PROGRESS_OPTION_ID=$(get_field_option_id_dynamic "status" "In Progress")
+IN_PROGRESS_OPTION_ID=$(get_field_option "status" "in_progress")
 
-if [[ "$DRY_RUN" == "true" ]]; then
-    print_header "🔍 DRY-RUN: Starting Task #$ISSUE_NUMBER"
-    echo -e "${CYAN}🔍 DRY-RUN MODE ENABLED - No actual changes will be made${NC}"
-else
-    print_header "Starting Task #$ISSUE_NUMBER"
-fi
+print_dry_run_header "Starting Task #$ISSUE_NUMBER"
 
 echo -e "${BLUE}📊 Project ID: $PROJECT_ID${NC}"
 echo ""
@@ -100,25 +79,32 @@ echo ""
 # Get issue details and check if it exists
 echo "🔍 Checking issue #$ISSUE_NUMBER..."
 
-# In dry-run mode, mock the issue check for demonstration
-if [[ "$DRY_RUN" == "true" ]]; then
+if is_dry_run; then
     echo -e "${CYAN}🔍 DRY-RUN: Mocking issue check for demonstration${NC}"
     ISSUE_TITLE="Mock Issue Title for Issue #$ISSUE_NUMBER"
     ISSUE_ID="MOCK_ISSUE_ID"
     echo -e "${GREEN}✅ Mock issue: $ISSUE_TITLE${NC}"
     
     # For dry-run demonstration, use a mock project item ID
-    PROJECT_ITEM_ID="MOCK_PROJECT_ITEM_ID_FOR_DRY_RUN"
+    PROJECT_ITEM_ID=$(generate_mock_project_item_id)
     echo -e "${CYAN}🔍 DRY-RUN: Using mock Project Item ID for demonstration${NC}"
     echo -e "${BLUE}📋 Project Item ID: $PROJECT_ITEM_ID${NC}"
 else
-    # Read-only operations are safe in both modes
+    # Get issue details and project item ID
     ISSUE_DATA=$(gh api graphql -f query='
       query {
-        repository(owner: "b-coman", name: "prop-management") {
+        repository(owner: "'$GITHUB_OWNER'", name: "'$GITHUB_REPO'") {
           issue(number: '$ISSUE_NUMBER') {
             title
             id
+            projectItems(first: 10) {
+              nodes {
+                id
+                project {
+                  id
+                }
+              }
+            }
           }
         }
       }')
@@ -127,12 +113,15 @@ else
     if echo "$ISSUE_DATA" | jq -e '.data.repository.issue' > /dev/null; then
         ISSUE_TITLE=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.title')
         ISSUE_ID=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.id')
+        PROJECT_ITEM_ID=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.projectItems.nodes[] | select(.project.id == "'$PROJECT_ID'") | .id')
         
         echo -e "${GREEN}✅ Found issue: $ISSUE_TITLE${NC}"
         
-        # In real mode, we would query for the actual project item ID
-        echo -e "${YELLOW}⚠️  Real mode would query for project item ID here${NC}"
-        PROJECT_ITEM_ID="WOULD_QUERY_REAL_PROJECT_ITEM_ID"
+        if [ "$PROJECT_ITEM_ID" = "null" ] || [ -z "$PROJECT_ITEM_ID" ]; then
+            echo -e "${RED}❌ Issue #$ISSUE_NUMBER not found in project${NC}"
+            exit 1
+        fi
+        
         echo -e "${BLUE}📋 Project Item ID: $PROJECT_ITEM_ID${NC}"
     else
         echo -e "${RED}❌ Issue #$ISSUE_NUMBER not found${NC}"
@@ -144,16 +133,16 @@ fi
 echo ""
 echo "🔗 Checking dependencies..."
 
-if [[ "$DRY_RUN" == "true" ]]; then
+if is_dry_run; then
     # Mock dependency data for dry-run
-    CURRENT_STATUS="Ready"
-    DEPENDENCIES="Issue #35, Issue #37"
+    CURRENT_STATUS=$(generate_mock_status_data)
+    DEPENDENCIES=$(generate_mock_dependencies)
     echo -e "${CYAN}🔍 DRY-RUN: Mocking dependency check${NC}"
     echo -e "${BLUE}📊 Mock Current Status: $CURRENT_STATUS${NC}"
     echo -e "${YELLOW}⚠️  Mock Dependencies: $DEPENDENCIES${NC}"
     echo -e "${CYAN}🔍 DRY-RUN: Would check if dependencies are resolved${NC}"
 else
-    # Get current status
+    # Get current status and dependencies
     CURRENT_STATUS_QUERY='
       query {
         node(id: "'$PROJECT_ITEM_ID'") {
@@ -207,27 +196,21 @@ UPDATE_MUTATION='
     }
   }'
 
-execute_mutation "$UPDATE_MUTATION"
+execute_mutation "$UPDATE_MUTATION" "Move issue #$ISSUE_NUMBER to In Progress"
 
-if [[ "$DRY_RUN" == "true" ]]; then
-    echo ""
-    echo -e "${GREEN}✅ DRY-RUN COMPLETE: Task #$ISSUE_NUMBER would be moved to 'In Progress'${NC}"
-    echo -e "${CYAN}🔍 Changes that would be made:${NC}"
-    echo -e "${CYAN}   - Project Item ID: $PROJECT_ITEM_ID${NC}"
-    echo -e "${CYAN}   - Status Field ID: $STATUS_FIELD_ID${NC}"
-    echo -e "${CYAN}   - New Status Option ID: $IN_PROGRESS_OPTION_ID${NC}"
-    echo -e "${CYAN}   - GraphQL Mutation: updateProjectV2ItemFieldValue${NC}"
+if is_dry_run; then
+    print_dry_run_summary "Start Task" "$ISSUE_NUMBER" "Status: Ready → In Progress"
 else
     echo -e "${GREEN}✅ Task #$ISSUE_NUMBER moved to 'In Progress'${NC}"
 fi
 
 echo ""
 echo "🔧 Next steps:"
-echo "   📊 Check progress: ./query-project-status.sh"
-echo "   ✅ Complete task: ./complete-task.sh $ISSUE_NUMBER"
-echo "   🔗 View project: https://github.com/users/b-coman/projects/3"
+echo "   📊 Check progress: ./gh-pm status"
+echo "   ✅ Complete task: ./gh-pm complete $ISSUE_NUMBER"
+echo "   🔗 View project: $(get_project_url)"
 
-if [[ "$DRY_RUN" == "true" ]]; then
+if is_dry_run; then
     echo ""
     echo -e "${CYAN}🔍 To execute for real, run without --dry-run flag${NC}"
 fi
