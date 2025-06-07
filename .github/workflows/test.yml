@@ -157,8 +157,8 @@ jobs:
           echo "⚠️  config.json found in git history - verify no secrets committed"
         fi
         
-        # Check for hardcoded secrets patterns
-        if grep -r "ghp_\|github_pat_\|sk-" . --exclude-dir=.git || true; then
+        # Check for hardcoded secrets patterns (more specific to avoid false positives)
+        if grep -rE "ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82}|sk-[a-zA-Z0-9]{48}" . --exclude-dir=.git; then
           echo "❌ Potential secrets found in repository"
           exit 1
         fi
