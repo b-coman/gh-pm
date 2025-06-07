@@ -122,7 +122,7 @@ jobs:
         echo "Testing injection attack prevention..."
         
         # Test SQL injection
-        if ./scripts/start-workflow-task.sh --dry-run "'; DROP TABLE users;--" 2>&1 | grep -q "must be numeric"; then
+        if ./scripts/workflow/start-workflow-task.sh --dry-run "'; DROP TABLE users;--" 2>&1 | grep -q "must be numeric"; then
           echo "✅ SQL injection properly rejected"
         else
           echo "❌ SQL injection vulnerability detected"
@@ -130,7 +130,7 @@ jobs:
         fi
         
         # Test GraphQL injection  
-        if ./scripts/review-workflow-task.sh --dry-run '"; } mutation { deleteAll } { "' 2>&1 | grep -q "must be numeric"; then
+        if ./scripts/workflow/review-workflow-task.sh --dry-run '"; } mutation { deleteAll } { "' 2>&1 | grep -q "must be numeric"; then
           echo "✅ GraphQL injection properly rejected"
         else
           echo "❌ GraphQL injection vulnerability detected"
@@ -138,7 +138,7 @@ jobs:
         fi
         
         # Test command injection
-        if ./scripts/complete-task.sh --dry-run '$(rm -rf /)' 2>&1 | grep -q "must be numeric"; then
+        if ./scripts/workflow/complete-task.sh --dry-run '$(rm -rf /)' 2>&1 | grep -q "must be numeric"; then
           echo "✅ Command injection properly rejected"
         else
           echo "❌ Command injection vulnerability detected"
@@ -177,9 +177,9 @@ jobs:
         echo "Testing dry-run mode prevents actual execution..."
         
         # All these should complete without errors and without making real changes
-        ./scripts/start-workflow-task.sh --dry-run 42 || { echo "❌ start-workflow-task dry-run failed"; exit 1; }
-        ./scripts/review-workflow-task.sh --dry-run 42 "test" || { echo "❌ review-workflow-task dry-run failed"; exit 1; }
-        ./scripts/complete-task.sh --dry-run 42 "test" || { echo "❌ complete-task dry-run failed"; exit 1; }
+        ./scripts/workflow/start-workflow-task.sh --dry-run 42 || { echo "❌ start-workflow-task dry-run failed"; exit 1; }
+        ./scripts/workflow/review-workflow-task.sh --dry-run 42 "test" || { echo "❌ review-workflow-task dry-run failed"; exit 1; }
+        ./scripts/workflow/complete-task.sh --dry-run 42 "test" || { echo "❌ complete-task dry-run failed"; exit 1; }
         
         echo "✅ Dry-run mode working correctly"
 
@@ -199,7 +199,7 @@ jobs:
         missing_headers=0
         
         # Check that main scripts have proper headers
-        for script in scripts/*.sh; do
+        for script in scripts/*/*.sh; do
           if [[ -f "$script" ]] && ! grep -q "@fileoverview" "$script"; then
             echo "❌ Missing header: $script"
             missing_headers=$((missing_headers + 1))

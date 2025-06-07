@@ -38,8 +38,8 @@ run_security_test() {
     TESTS_RUN=$((TESTS_RUN + 1))
     echo -n "  $test_name ... "
     
-    # Run the script with malicious input and capture result
-    if output=$(cd "$PROJECT_ROOT" && "$script_path" $malicious_input 2>&1); then
+    # Run the script with malicious input and capture result (with --dry-run for safety)
+    if output=$(cd "$PROJECT_ROOT" && "$script_path" --dry-run $malicious_input 2>&1); then
         # Script didn't fail - check if it should have
         if [[ "$expected_behavior" == "REJECT" ]]; then
             echo "❌ (should have rejected input)"
@@ -90,12 +90,12 @@ INJECTION_TESTS=(
 
 # Test hardened workflow scripts
 WORKFLOW_SCRIPTS=(
-    "./scripts/start-workflow-task.sh --dry-run"
-    "./scripts/review-workflow-task.sh --dry-run"
-    "./scripts/complete-task.sh --dry-run"
-    "./scripts/request-rework.sh --dry-run"
-    "./scripts/start-task.sh --dry-run"
-    "./scripts/move-to-ready.sh --dry-run"
+    "./scripts/workflow/start-workflow-task.sh"
+    "./scripts/workflow/review-workflow-task.sh"
+    "./scripts/workflow/complete-task.sh"
+    "./scripts/workflow/request-rework.sh"
+    "./scripts/workflow/start-task.sh"
+    "./scripts/workflow/move-to-ready.sh"
 )
 
 echo ""
