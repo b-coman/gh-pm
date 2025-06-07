@@ -57,6 +57,9 @@ if [ -z "$ISSUE_NUMBER" ]; then
     exit 1
 fi
 
+# Validate issue number
+validate_issue_number "$ISSUE_NUMBER" || exit $ERR_INVALID_INPUT
+
 # Validate configuration
 if ! validate_config; then
     echo "❌ Configuration validation failed. Run './gh-pm configure' to fix issues."

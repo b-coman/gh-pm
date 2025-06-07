@@ -115,11 +115,34 @@ for script in "${WORKFLOW_SCRIPTS[@]}"; do
             display_input="$display_input..."
         fi
         
-        run_security_test \
-            "Injection test: '$display_input'" \
-            "$script" \
-            "\"$malicious_input\"" \
-            "REJECT"
+        # Handle scripts with different argument patterns
+        case "$script_name" in
+            "request-rework.sh"|"review-workflow-task.sh")
+                # These scripts need: <issue-number> <message>
+                # Test malicious input as issue number (first arg) - should be rejected
+                run_security_test \
+                    "Issue validation: '$display_input'" \
+                    "$script" \
+                    "\"$malicious_input\" \"safe message\"" \
+                    "REJECT"
+                ;;
+            "complete-task.sh")
+                # complete-task has optional message as second arg
+                run_security_test \
+                    "Issue validation: '$display_input'" \
+                    "$script" \
+                    "\"$malicious_input\"" \
+                    "REJECT"
+                ;;
+            *)
+                # Default: single argument scripts (issue number)
+                run_security_test \
+                    "Issue validation: '$display_input'" \
+                    "$script" \
+                    "\"$malicious_input\"" \
+                    "REJECT"
+                ;;
+        esac
     done
 done
 
@@ -134,11 +157,25 @@ for script in "${WORKFLOW_SCRIPTS[@]}"; do
     script_name=$(echo "$script" | awk '{print $1}' | xargs basename)
     
     for valid_input in "${VALID_INPUTS[@]}"; do
-        run_security_test \
-            "$script_name with valid input '$valid_input'" \
-            "$script" \
-            "$valid_input" \
-            "ACCEPT"
+        # Handle scripts with different argument patterns
+        case "$script_name" in
+            "request-rework.sh"|"review-workflow-task.sh")
+                # These scripts need: <issue-number> <message>
+                run_security_test \
+                    "$script_name with valid input '$valid_input'" \
+                    "$script" \
+                    "$valid_input \"Test message\"" \
+                    "ACCEPT"
+                ;;
+            *)
+                # Default: single argument scripts
+                run_security_test \
+                    "$script_name with valid input '$valid_input'" \
+                    "$script" \
+                    "$valid_input" \
+                    "ACCEPT"
+                ;;
+        esac
     done
 done
 
@@ -150,7 +187,7 @@ echo "================================"
 echo "  Checking authentication validation is present in scripts..."
 
 AUTH_CHECK_COUNT=0
-for script_file in scripts/*.sh; do
+for script_file in scripts/*/*.sh; do
     if [[ -f "$script_file" ]] && grep -q "validate_github_auth" "$script_file"; then
         AUTH_CHECK_COUNT=$((AUTH_CHECK_COUNT + 1))
     fi

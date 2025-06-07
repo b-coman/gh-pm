@@ -25,6 +25,10 @@
 # Field management utilities for gh-pm
 # Handles dynamic field creation and lookup
 
+# Load dry-run utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/dry-run-utils.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -123,6 +127,67 @@ create_text_field() {
 # Query all fields for a project and return as JSON
 get_project_fields() {
     local project_id="$1"
+    
+    # Return mock data in dry-run mode
+    if is_dry_run; then
+        cat << 'EOF'
+{
+  "data": {
+    "node": {
+      "fields": {
+        "nodes": [
+          {
+            "id": "PVTSSF_status",
+            "name": "Status", 
+            "dataType": "SINGLE_SELECT",
+            "options": [
+              {"id": "PVTSSFO_todo", "name": "Todo"},
+              {"id": "PVTSSFO_ready", "name": "Ready"},
+              {"id": "PVTSSFO_in_progress", "name": "In Progress"},
+              {"id": "PVTSSFO_review", "name": "Review"},
+              {"id": "PVTSSFO_done", "name": "Done"}
+            ]
+          },
+          {
+            "id": "PVTSSF_workflow_status",
+            "name": "Workflow Status",
+            "dataType": "SINGLE_SELECT", 
+            "options": [
+              {"id": "PVTSSFO_ready", "name": "🔵 Ready"},
+              {"id": "PVTSSFO_in_progress", "name": "🟡 In Progress"},
+              {"id": "PVTSSFO_review", "name": "🟣 Review"},
+              {"id": "PVTSSFO_done", "name": "✅ Done"},
+              {"id": "PVTSSFO_blocked", "name": "🔒 Blocked"}
+            ]
+          },
+          {
+            "id": "PVTSSF_task_type",
+            "name": "Task Type",
+            "dataType": "SINGLE_SELECT"
+          },
+          {
+            "id": "PVTSSF_risk_level", 
+            "name": "Risk Level",
+            "dataType": "SINGLE_SELECT"
+          },
+          {
+            "id": "PVTSSF_effort",
+            "name": "Effort",
+            "dataType": "SINGLE_SELECT"
+          },
+          {
+            "id": "PVTSSF_dependencies",
+            "name": "Dependencies",
+            "dataType": "TEXT"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+        return 0
+    fi
     
     local query='
     query {
