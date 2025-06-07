@@ -1,4 +1,28 @@
 #!/bin/bash
+# @fileoverview Create a new Workflow Status field with complete workflow
+# @module legacy/create-workflow-status
+#
+# @description
+# Creates a comprehensive Workflow Status field with 6 status options:
+# Backlog, Ready, Blocked, In Progress, Review, Done. Sets foundation tasks
+# to Ready and dependent tasks to Blocked. Supports dry-run mode.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh
+# - Commands: gh, jq
+# - Files: project-info.json
+# - APIs: GitHub GraphQL v4 (createProjectV2Field, updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./create-workflow-status.sh [--dry-run]
+#
+# @options
+# --dry-run    Preview changes without executing
+#
+# @example
+# ./create-workflow-status.sh
+# ./create-workflow-status.sh --dry-run
+
 # Create a new Workflow Status field with our complete workflow
 
 set -e

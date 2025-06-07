@@ -1,4 +1,25 @@
 #!/bin/bash
+# @fileoverview Configure field values for project issues
+# @module setup/configure-project-fields
+#
+# @description
+# Provides comprehensive guidance for setting up project field configurations.
+# Displays standard field options for Task Type, Risk Level, Effort, and Status
+# with detailed configuration guidance and best practices for project management.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh, ../lib/config-utils.sh
+# - Commands: jq
+#
+# @usage
+# ./configure-project-fields.sh [--dry-run]
+#
+# @options
+# --dry-run    Preview guidance without side effects
+#
+# @example
+# ./configure-project-fields.sh
+# ./configure-project-fields.sh --dry-run
 
 # Configure field values for project issues
 # Provides guidance for setting up project field configurations

@@ -1,4 +1,22 @@
 #!/bin/bash
+# @fileoverview Check dependencies and suggest tasks that can be moved to Ready
+# @module admin/check-dependencies
+#
+# @description
+# Analyzes project dependencies and provides recommendations for tasks that
+# can be moved to Ready status. Displays project status overview, blocked tasks,
+# and actionable items with specific commands to unblock dependencies.
+#
+# @dependencies
+# - Commands: jq, gh
+# - Files: project-info.json
+# - APIs: GitHub GraphQL v4 (project queries)
+#
+# @usage
+# ./check-dependencies.sh
+#
+# @example
+# ./check-dependencies.sh
 
 # Check dependencies and suggest tasks that can be moved to Ready
 

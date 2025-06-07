@@ -1,4 +1,28 @@
 #!/bin/bash
+# @fileoverview Approve a task in review by moving to Done with approval comment
+# @module workflow/approve-task
+#
+# @description
+# Approves a task in review status by moving it to Done and adding an approval
+# comment. Validates current status, checks for dependent tasks that can proceed,
+# and provides comprehensive feedback. Enhanced with dry-run capability.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh, ../lib/config-utils.sh, ../lib/security-utils.sh
+# - Commands: gh, jq
+# - Files: project-info.json
+# - APIs: GitHub GraphQL v4 (updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./approve-task.sh [--dry-run] <issue-number> [approval-message]
+#
+# @options
+# --dry-run    Preview changes without executing
+#
+# @example
+# ./approve-task.sh 42
+# ./approve-task.sh 42 "Great work on the implementation"
+# ./approve-task.sh --dry-run 42
 
 # Approve a task in review by moving to Done with approval comment
 # Enhanced with dry-run capability

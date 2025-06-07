@@ -1,4 +1,23 @@
 #!/bin/bash
+# @fileoverview Configure initial status for all project items
+# @module legacy/configure-initial-status
+#
+# @description
+# Legacy script that configures initial status for all project items using
+# hardcoded field and option IDs. Sets foundation tasks to Todo status and
+# remaining tasks to Todo (blocked). Superseded by dynamic field configuration.
+#
+# @dependencies
+# - Commands: gh, jq
+# - Files: project-info.json
+# - APIs: GitHub GraphQL v4 (updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./configure-initial-status.sh
+#
+# @example
+# ./configure-initial-status.sh
+
 # Configure initial status for all project items
 
 set -e

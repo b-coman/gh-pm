@@ -1,4 +1,26 @@
 #!/bin/bash
+# @fileoverview Set up issue dependencies using GitHub's native blocking relationships
+# @module setup/setup-issue-dependencies
+#
+# @description
+# Sets up generic dependency relationships for project workflow using GitHub's
+# native blocking relationships. Provides best practices guidance for dependency
+# management and removes blocked labels from foundation tasks.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh, ../lib/config-utils.sh
+# - Commands: gh
+#
+# @usage
+# ./setup-issue-dependencies.sh [--dry-run]
+#
+# @options
+# --dry-run    Preview dependency setup without making changes
+#
+# @example
+# ./setup-issue-dependencies.sh
+# ./setup-issue-dependencies.sh --dry-run
+
 # Set up issue dependencies using GitHub's native blocking relationships
 
 set -e

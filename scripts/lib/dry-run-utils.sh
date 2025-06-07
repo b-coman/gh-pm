@@ -1,4 +1,25 @@
 #!/bin/bash
+# @fileoverview Shared dry-run utilities for GitHub Project AI Manager scripts
+# @module lib/dry-run-utils
+#
+# @description
+# Provides comprehensive dry-run capability for all gh-pm scripts including
+# safe API wrappers, mock data generation, validation helpers, and formatted
+# output functions. Enables safe testing of operations without making real changes.
+#
+# @dependencies
+# - Commands: gh, jq
+# - Environment: DRY_RUN_MODE (optional)
+#
+# @usage
+# source "path/to/dry-run-utils.sh"
+# init_dry_run "$@"
+# if is_dry_run; then echo "Mock mode"; fi
+#
+# @example
+# source "../lib/dry-run-utils.sh"
+# init_dry_run "$@"
+# execute_mutation "$mutation" "description"
 
 # Shared dry-run utilities for GitHub Project AI Manager scripts
 # This file provides common functions for implementing dry-run capability

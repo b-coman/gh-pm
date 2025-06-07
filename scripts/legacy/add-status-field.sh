@@ -1,4 +1,23 @@
 #!/bin/bash
+# @fileoverview Add Status field to existing GitHub Project
+# @module legacy/add-status-field
+#
+# @description
+# Creates a Status field with workflow states (Backlog, Ready, In Progress, Review, Done)
+# for an existing GitHub Project. Sets all issues to Backlog initially, then moves
+# foundation tasks to Ready status. This is a legacy script superseded by enhanced workflow.
+#
+# @dependencies
+# - Commands: gh, jq
+# - Files: project-info.json
+# - APIs: GitHub GraphQL v4 (createProjectV2Field, updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./add-status-field.sh
+#
+# @example
+# ./add-status-field.sh
+
 # Add Status field to existing GitHub Project
 
 set -e

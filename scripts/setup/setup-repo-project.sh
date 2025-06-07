@@ -1,4 +1,25 @@
 #!/bin/bash
+# @fileoverview Alternative setup using repository projects (no special permissions needed)
+# @module setup/setup-repo-project
+#
+# @description
+# Provides alternative project setup guidance using repository-level classic projects
+# for users without access to GitHub Projects v2. Includes manual setup instructions
+# and recommends upgrading to Projects v2 for better features.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh, ../lib/config-utils.sh, ../lib/security-utils.sh
+# - Commands: gh
+#
+# @usage
+# ./setup-repo-project.sh [--dry-run]
+#
+# @options
+# --dry-run    Preview setup guidance without side effects
+#
+# @example
+# ./setup-repo-project.sh
+# ./setup-repo-project.sh --dry-run
 
 # Alternative setup using repository projects (no special permissions needed)
 

@@ -1,4 +1,23 @@
 #!/bin/bash
+# @fileoverview Query project status using the Workflow Status field
+# @module admin/query-workflow-status
+#
+# @description
+# Queries and displays project status using the enhanced Workflow Status field.
+# Shows tasks organized by workflow status (Ready, Blocked, In Progress, Done)
+# with detailed dependency analysis and AI-powered recommendations for next actions.
+#
+# @dependencies
+# - Commands: gh, jq
+# - Files: project-info.json
+# - APIs: GitHub GraphQL v4 (project queries)
+#
+# @usage
+# ./query-workflow-status.sh
+#
+# @example
+# ./query-workflow-status.sh
+
 # Query project status using the new Workflow Status field
 
 set -e

@@ -1,4 +1,26 @@
 #!/bin/bash
+# @fileoverview Move foundation tasks to Ready status
+# @module admin/move-foundation-tasks-ready
+#
+# @description
+# Moves configured foundation tasks from their current status to Ready status.
+# Foundation tasks are the core infrastructure tasks that have no dependencies
+# and can be started immediately. Supports dry-run mode for safe testing.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh, ../lib/config-utils.sh
+# - Commands: gh, jq
+# - APIs: GitHub GraphQL v4 (updateProjectV2ItemFieldValue)
+#
+# @usage
+# ./move-foundation-tasks-ready.sh [--dry-run]
+#
+# @options
+# --dry-run    Preview changes without executing
+#
+# @example
+# ./move-foundation-tasks-ready.sh
+# ./move-foundation-tasks-ready.sh --dry-run
 
 # Move foundation tasks to "Ready" status
 

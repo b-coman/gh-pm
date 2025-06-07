@@ -1,4 +1,24 @@
 #!/bin/bash
+# @fileoverview Query current project status - comprehensive project dashboard
+# @module admin/query-project-status
+#
+# @description
+# Provides a comprehensive project dashboard displaying all project items
+# organized by task type, status summary, progress metrics, dependency analysis,
+# and actionable recommendations. Shows tasks grouped by Foundation, Enhancement,
+# Migration, QA, and Documentation categories.
+#
+# @dependencies
+# - Scripts: ../lib/config-utils.sh, ../lib/security-utils.sh
+# - Commands: gh, jq
+# - Files: project-info.json
+# - APIs: GitHub GraphQL v4 (project queries)
+#
+# @usage
+# ./query-project-status.sh
+#
+# @example
+# ./query-project-status.sh
 
 # Query current project status - comprehensive project dashboard
 

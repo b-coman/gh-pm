@@ -1,4 +1,23 @@
 #!/bin/bash
+# @fileoverview Enhance Status field with Ready, Blocked, Review options
+# @module legacy/enhance-status-field
+#
+# @description
+# Legacy script that enhances an existing Status field by adding Ready, Blocked,
+# and Review options to the original Todo, In Progress, Done options. Uses
+# hardcoded field IDs and updateProjectV2FieldOptions mutation.
+#
+# @dependencies
+# - Commands: gh, jq
+# - Files: project-info.json
+# - APIs: GitHub GraphQL v4 (updateProjectV2FieldOptions)
+#
+# @usage
+# ./enhance-status-field.sh
+#
+# @example
+# ./enhance-status-field.sh
+
 # Enhance Status field with Ready, Blocked, Review options
 
 set -e

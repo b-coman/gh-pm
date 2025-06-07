@@ -1,4 +1,26 @@
 #!/bin/bash
+# @fileoverview Configuration utilities for gh-pm
+# @module lib/config-utils
+#
+# @description
+# Provides comprehensive configuration management functions for gh-pm including
+# loading, validation, and dynamic field lookup. Handles GitHub project configuration,
+# field ID resolution, and config file management with proper error handling.
+#
+# @dependencies
+# - Scripts: field-utils.sh (for dynamic lookups)
+# - Commands: jq
+# - Files: config.json, config-template.json
+#
+# @usage
+# source "path/to/config-utils.sh"
+# get_config "github.owner"
+# validate_config
+#
+# @example
+# source "../lib/config-utils.sh"
+# PROJECT_ID=$(get_project_id)
+# OWNER=$(get_github_owner)
 
 # Configuration utilities for gh-pm
 # Provides functions to load and validate configuration

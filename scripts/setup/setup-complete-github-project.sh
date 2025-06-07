@@ -1,4 +1,26 @@
 #!/bin/bash
+# @fileoverview Master Setup Script for GitHub Project
+# @module setup/setup-complete-github-project
+#
+# @description
+# Orchestrates the complete GitHub Project setup process including prerequisite
+# verification, authentication checks, project creation, field configuration,
+# and manual setup guidance. Provides comprehensive error handling and dry-run support.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh, setup-github-project.sh, configure-project-fields.sh
+# - Commands: gh, jq
+# - APIs: GitHub GraphQL v4 (authentication and permission checks)
+#
+# @usage
+# ./setup-complete-github-project.sh [--dry-run]
+#
+# @options
+# --dry-run    Preview setup process without creating resources
+#
+# @example
+# ./setup-complete-github-project.sh
+# ./setup-complete-github-project.sh --dry-run
 
 # Master Setup Script for GitHub Project
 # This script orchestrates the complete project setup process

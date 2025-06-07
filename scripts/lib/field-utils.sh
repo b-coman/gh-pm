@@ -1,4 +1,26 @@
 #!/bin/bash
+# @fileoverview Field management utilities for gh-pm
+# @module lib/field-utils
+#
+# @description
+# Handles dynamic field creation, lookup, and management for GitHub Projects.
+# Provides functions to create single select and text fields, query project fields,
+# find field and option IDs, and update configuration with discovered field IDs.
+#
+# @dependencies
+# - Commands: gh, jq
+# - Files: config.json (for field ID updates)
+# - APIs: GitHub GraphQL v4 (createProjectV2Field, project field queries)
+#
+# @usage
+# source "path/to/field-utils.sh"
+# create_single_select_field "$project_id" "Field Name" '["Option1", "Option2"]'
+# field_id=$(find_field_id_by_name "$project_id" "Field Name")
+#
+# @example
+# source "../lib/field-utils.sh"
+# create_standard_fields "$PROJECT_ID"
+# update_config_with_field_ids "$PROJECT_ID"
 
 # Field management utilities for gh-pm
 # Handles dynamic field creation and lookup

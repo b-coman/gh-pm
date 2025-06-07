@@ -1,4 +1,25 @@
 #!/bin/bash
+# @fileoverview Simplified field configuration script
+# @module setup/configure-project-fields-simple
+#
+# @description
+# Provides simplified project setup guidance and dependency recommendations.
+# Displays recommended project structure organized by task types (Foundation,
+# Enhancement, Migration, QA, Documentation) with manual setup steps.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh, ../lib/config-utils.sh
+# - Commands: jq
+#
+# @usage
+# ./configure-project-fields-simple.sh [--dry-run]
+#
+# @options
+# --dry-run    Preview guidance without side effects
+#
+# @example
+# ./configure-project-fields-simple.sh
+# ./configure-project-fields-simple.sh --dry-run
 
 # Simplified field configuration script
 # Configure project dependencies - simplified version

@@ -1,4 +1,26 @@
 #!/bin/bash
+# @fileoverview GitHub Project Setup Script
+# @module setup/setup-github-project
+#
+# @description
+# Creates a new GitHub Project with custom fields including Task Type, Risk Level,
+# Effort, and Dependencies. Enhanced with comprehensive dry-run capability to prevent
+# accidental project creation. Handles authentication validation and configuration saving.
+#
+# @dependencies
+# - Scripts: ../lib/dry-run-utils.sh, ../lib/config-utils.sh, ../lib/security-utils.sh
+# - Commands: gh, jq
+# - APIs: GitHub GraphQL v4 (createProjectV2, createProjectV2Field)
+#
+# @usage
+# ./setup-github-project.sh [--dry-run]
+#
+# @options
+# --dry-run    Preview project creation without making changes
+#
+# @example
+# ./setup-github-project.sh
+# ./setup-github-project.sh --dry-run
 
 # GitHub Project Setup Script
 # Enhanced with dry-run capability - CRITICAL for preventing accidental project creation
