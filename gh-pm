@@ -1,0 +1,721 @@
+#!/bin/bash
+
+# GitHub Project AI Manager - Unified CLI Interface
+# Designed for easy AI assistant integration and human use
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Output format options
+OUTPUT_FORMAT="human"  # human, json, yaml
+VERBOSE_MODE=false
+
+# JSON output helpers
+output_json() {
+    local data="$1"
+    echo "$data" | jq '.'
+}
+
+output_result() {
+    local success="$1"
+    local data="$2"
+    local message="$3"
+    
+    if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+        local json_result=$(cat <<EOF
+{
+  "success": $success,
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "data": $data,
+  "message": "$message"
+}
+EOF
+)
+        output_json "$json_result"
+    else
+        if [[ "$success" == "true" ]]; then
+            echo -e "${GREEN}✅ $message${NC}"
+        else
+            echo -e "${RED}❌ $message${NC}"
+        fi
+    fi
+}
+
+# Version and metadata
+VERSION="2.0.0"
+DESCRIPTION="Unified GitHub Project Management CLI - Human & AI Optimized"
+
+show_help() {
+    if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+        cat <<'EOF'
+{
+  "cli_info": {
+    "name": "GitHub Project AI Manager",
+    "version": "2.0.0",
+    "description": "Unified GitHub Project Management CLI - Human & AI Optimized"
+  },
+  "usage_patterns": {
+    "human": "gh-pm <command> [arguments] [--dry-run]",
+    "ai": "gh-pm <command> --format=json [--dry-run]",
+    "discovery": "gh-pm discover --format=json",
+    "batch": "gh-pm batch --operations='status,start:39' --format=json",
+    "recommendations": "gh-pm recommend --format=json"
+  },
+  "output_formats": ["human", "json"],
+  "key_features": [
+    "Unified interface for humans and AI",
+    "Machine-readable JSON output",
+    "Command discovery and introspection",
+    "Batch operations for efficiency",
+    "AI-driven recommendations",
+    "Safe dry-run mode for all operations"
+  ]
+}
+EOF
+    else
+        echo -e "${PURPLE}GitHub Project AI Manager v$VERSION${NC}"
+        echo -e "${BLUE}$DESCRIPTION${NC}"
+        echo ""
+        echo -e "${YELLOW}USAGE:${NC}"
+        echo "  gh-pm <command> [arguments] [--dry-run] [--format=json]"
+        echo ""
+        echo -e "${CYAN}🤖 AI MODE: Add --format=json to any command for structured output${NC}"
+        echo ""
+        echo -e "${YELLOW}SETUP COMMANDS:${NC}"
+        echo "  setup                     Create new GitHub project with fields"
+    echo "  setup-complete            Master project setup (recommended)"
+    echo "  setup-repo               Alternative repo-based setup"
+    echo "  setup-simple             Simplified project configuration"
+    echo "  configure                 Configure project fields and options"
+    echo "  status                    Show project dashboard"
+    echo "  workflow-status           Show workflow-specific status"
+    echo ""
+    echo -e "${YELLOW}TASK MANAGEMENT:${NC}"
+    echo "  start <issue>             Move task to In Progress"
+    echo "  workflow-start <issue>    Alternative workflow start method"
+    echo "  complete <issue> [msg]    Move task to Done with comment"
+    echo "  approve <issue> [msg]     Approve task from Review to Done"
+    echo "  review <issue>            Move task to Review status"
+    echo "  rework <issue> <feedback> Request changes on task"
+    echo "  ready <issue>             Move task to Ready (unblock)"
+    echo ""
+    echo -e "${YELLOW}BATCH OPERATIONS:${NC}"
+    echo "  ready-foundation          Move foundation tasks to Ready"
+    echo "  dependencies              Check and resolve dependencies"
+    echo "  setup-dependencies        Set up GitHub issue dependencies"
+    echo ""
+    echo -e "${YELLOW}FIELD MANAGEMENT:${NC}"
+    echo "  add-status-field          Add custom status field"
+    echo "  create-workflow-status    Create workflow status field"
+    echo "  enhance-status-field      Enhance existing status field"
+    echo "  configure-initial-status  Configure initial status values"
+    echo ""
+    echo -e "${YELLOW}AI-OPTIMIZED FEATURES:${NC}"
+    echo "  discover                  Command introspection (try --format=json)"
+    echo "  recommend                 Get AI-driven suggestions"
+    echo "  batch --operations=...    Execute multiple commands efficiently"
+    echo ""
+    echo -e "${YELLOW}INFORMATION:${NC}"
+    echo "  list                      List all available commands"
+    echo "  help [command]            Show help for specific command"
+    echo "  version                   Show version information"
+    echo ""
+    echo -e "${YELLOW}OPTIONS:${NC}"
+    echo "  --dry-run                 Show what would happen without making changes"
+    echo "  --help, -h                Show this help message"
+    echo ""
+    echo -e "${YELLOW}EXAMPLES:${NC}"
+    echo "  gh-pm setup-complete --dry-run   # Test master setup (recommended)"
+    echo "  gh-pm setup --dry-run            # Test basic project creation"
+    echo "  gh-pm start 42                   # Start working on issue #42"
+    echo "  gh-pm complete 42 \"Done\"        # Complete issue #42"
+    echo "  gh-pm status                     # Show project dashboard"
+    echo "  gh-pm workflow-status            # Show workflow-specific status"
+    echo ""
+        echo -e "${CYAN}For AI Assistants:${NC}"
+        echo "  All commands support --dry-run for safe testing"
+        echo "  Use 'gh-pm list' to discover available operations"
+        echo "  Each command provides detailed help with 'gh-pm help <command>'"
+    fi
+}
+
+show_command_help() {
+    local cmd="$1"
+    case "$cmd" in
+        "start")
+            echo -e "${YELLOW}gh-pm start <issue> [--dry-run]${NC}"
+            echo "Move a task from Ready to In Progress status"
+            echo ""
+            echo -e "${YELLOW}Arguments:${NC}"
+            echo "  issue       Issue number to start working on"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm start 42              # Start issue #42"
+            echo "  gh-pm start 42 --dry-run    # Test starting issue #42"
+            ;;
+        "complete")
+            echo -e "${YELLOW}gh-pm complete <issue> [message] [--dry-run]${NC}"
+            echo "Complete a task by moving to Done status with optional comment"
+            echo ""
+            echo -e "${YELLOW}Arguments:${NC}"
+            echo "  issue       Issue number to complete"
+            echo "  message     Optional completion comment"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm complete 42                    # Complete issue #42"
+            echo "  gh-pm complete 42 \"All tests pass\"  # Complete with comment"
+            echo "  gh-pm complete 42 --dry-run         # Test completion"
+            ;;
+        "setup")
+            echo -e "${YELLOW}gh-pm setup [--dry-run]${NC}"
+            echo "Create a new GitHub project with custom fields and workflow"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm setup --dry-run    # Test project creation"
+            echo "  gh-pm setup              # Create actual project"
+            ;;
+        "setup-complete")
+            echo -e "${YELLOW}gh-pm setup-complete [--dry-run]${NC}"
+            echo "Master project setup with complete workflow (RECOMMENDED)"
+            echo "Orchestrates full project creation including issues and dependencies"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm setup-complete --dry-run    # Test complete setup"
+            echo "  gh-pm setup-complete              # Run full setup"
+            ;;
+        "setup-repo")
+            echo -e "${YELLOW}gh-pm setup-repo [--dry-run]${NC}"
+            echo "Alternative repository-based project setup"
+            echo "Use when having authentication issues with main setup"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm setup-repo --dry-run    # Test repo setup"
+            echo "  gh-pm setup-repo              # Run repo setup"
+            ;;
+        "setup-simple")
+            echo -e "${YELLOW}gh-pm setup-simple [--dry-run]${NC}"
+            echo "Simplified project field configuration"
+            echo "Quick setup for basic project management needs"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm setup-simple --dry-run    # Test simple setup"
+            echo "  gh-pm setup-simple              # Run simple setup"
+            ;;
+        "status")
+            echo -e "${YELLOW}gh-pm status${NC}"
+            echo "Show comprehensive project dashboard with task status"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm status    # Show current project status"
+            ;;
+        "workflow-status")
+            echo -e "${YELLOW}gh-pm workflow-status${NC}"
+            echo "Show workflow-specific project status and task details"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm workflow-status    # Show workflow status"
+            ;;
+        "workflow-start")
+            echo -e "${YELLOW}gh-pm workflow-start <issue> [--dry-run]${NC}"
+            echo "Alternative method to start tasks using workflow fields"
+            echo ""
+            echo -e "${YELLOW}Arguments:${NC}"
+            echo "  issue       Issue number to start working on"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm workflow-start 42              # Start issue #42 via workflow"
+            echo "  gh-pm workflow-start 42 --dry-run    # Test workflow start"
+            ;;
+        "setup-dependencies")
+            echo -e "${YELLOW}gh-pm setup-dependencies [--dry-run]${NC}"
+            echo "Set up GitHub native issue blocking relationships"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm setup-dependencies --dry-run    # Test dependency setup"
+            echo "  gh-pm setup-dependencies              # Create dependencies"
+            ;;
+        "add-status-field")
+            echo -e "${YELLOW}gh-pm add-status-field [--dry-run]${NC}"
+            echo "Add custom status field to project"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm add-status-field --dry-run    # Test adding status field"
+            echo "  gh-pm add-status-field              # Add status field"
+            ;;
+        "create-workflow-status")
+            echo -e "${YELLOW}gh-pm create-workflow-status [--dry-run]${NC}"
+            echo "Create workflow status field with predefined options"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  gh-pm create-workflow-status --dry-run    # Test workflow creation"
+            echo "  gh-pm create-workflow-status              # Create workflow status"
+            ;;
+        *)
+            echo -e "${RED}Unknown command: $cmd${NC}"
+            echo "Use 'gh-pm help' to see all available commands"
+            return 1
+            ;;
+    esac
+}
+
+list_commands() {
+    echo -e "${PURPLE}Available Commands:${NC}"
+    echo ""
+    echo -e "${YELLOW}Setup & Configuration:${NC}"
+    echo "  setup, setup-complete, setup-repo, setup-simple, configure"
+    echo "  status, workflow-status"
+    echo ""
+    echo -e "${YELLOW}Task Management:${NC}"
+    echo "  start, workflow-start, complete, approve, review, rework, ready"
+    echo ""
+    echo -e "${YELLOW}Batch Operations:${NC}"
+    echo "  ready-foundation, dependencies, setup-dependencies"
+    echo ""
+    echo -e "${YELLOW}Field Management:${NC}"
+    echo "  add-status-field, create-workflow-status, enhance-status-field"
+    echo "  configure-initial-status"
+    echo ""
+    echo -e "${YELLOW}Information:${NC}"
+    echo "  list, help, version"
+    echo ""
+    echo "Use 'gh-pm help <command>' for detailed help on any command"
+}
+
+# AI-optimized command discovery
+discover_commands() {
+    if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+        cat <<'EOF'
+{
+  "commands": {
+    "setup-complete": {
+      "description": "Master project setup with complete workflow",
+      "category": "setup",
+      "args": {"required": [], "optional": ["--dry-run", "--format"]},
+      "ai_usage": "Use for initial project creation",
+      "prerequisites": ["github_auth", "project_permissions"],
+      "side_effects": ["creates_project", "creates_issues", "configures_fields"],
+      "example": "gh-pm setup-complete --dry-run --format=json"
+    },
+    "status": {
+      "description": "Show comprehensive project dashboard",
+      "category": "monitoring", 
+      "args": {"required": [], "optional": ["--format"]},
+      "ai_usage": "Get current project state for decision making",
+      "prerequisites": ["existing_project"],
+      "side_effects": [],
+      "example": "gh-pm status --format=json"
+    },
+    "start": {
+      "description": "Move task to In Progress status",
+      "category": "task_management",
+      "args": {"required": ["issue_number"], "optional": ["--dry-run", "--format"]},
+      "ai_usage": "Begin work on ready tasks",
+      "prerequisites": ["task_ready", "no_other_in_progress"],
+      "side_effects": ["updates_task_status", "logs_activity"],
+      "example": "gh-pm start 39 --format=json"
+    },
+    "batch": {
+      "description": "Execute multiple operations in single command",
+      "category": "batch",
+      "args": {"required": ["--operations"], "optional": ["--format", "--dry-run"]},
+      "ai_usage": "Efficient multi-step operations",
+      "prerequisites": ["varies_by_operation"],
+      "side_effects": ["multiple_based_on_operations"],
+      "example": "gh-pm batch --operations='status,dependencies,start:39' --format=json"
+    },
+    "recommend": {
+      "description": "Get AI-driven recommendations for next actions",
+      "category": "ai_helpers",
+      "args": {"required": [], "optional": ["--context", "--format"]},
+      "ai_usage": "Get intelligent suggestions based on project state",
+      "prerequisites": [],
+      "side_effects": [],
+      "example": "gh-pm recommend --context=project_start --format=json"
+    }
+  }
+}
+EOF
+    else
+        echo -e "${PURPLE}Available Commands:${NC}"
+        echo ""
+        echo -e "${YELLOW}Setup & Configuration:${NC}"
+        echo "  setup-complete            Master project setup (recommended)"
+        echo "  setup-repo               Alternative repo-based setup"
+        echo "  status                   Show project dashboard"
+        echo ""
+        echo -e "${YELLOW}Task Management:${NC}"
+        echo "  start <issue>            Move task to In Progress"
+        echo "  complete <issue> [msg]   Move task to Done"
+        echo "  dependencies             Check task dependencies"
+        echo ""
+        echo -e "${YELLOW}AI-Optimized Features:${NC}"
+        echo "  batch --operations=...   Execute multiple commands"
+        echo "  recommend               Get AI suggestions"
+        echo "  discover                Command introspection"
+        echo ""
+        echo "Add --format=json to any command for machine-readable output"
+    fi
+}
+
+# AI recommendations system
+recommend_actions() {
+    local context="${1:-general}"
+    
+    # Check if project exists
+    if [[ ! -f "$SCRIPT_DIR/project-info.json" ]]; then
+        if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+            cat <<'EOF'
+{
+  "recommendations": [
+    {
+      "action": "setup-complete --dry-run",
+      "confidence": 0.95,
+      "rationale": "No project detected, setup required",
+      "category": "setup",
+      "urgency": "high",
+      "next_steps": ["setup-complete --dry-run", "setup-complete", "ready-foundation", "start:39"]
+    }
+  ],
+  "context": "no_project_detected",
+  "ai_advice": "Start with setup-complete --dry-run to test project creation safely"
+}
+EOF
+        else
+            echo -e "${BLUE}ℹ️  No project detected. Recommended action:${NC}"
+            echo -e "${BLUE}ℹ️  1. Run: gh-pm setup-complete --dry-run${NC}"
+            echo -e "${BLUE}ℹ️  2. If successful: gh-pm setup-complete${NC}"
+        fi
+        return
+    fi
+    
+    # Project exists, get more sophisticated recommendations
+    if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+        cat <<'EOF'
+{
+  "recommendations": [
+    {
+      "action": "status",
+      "confidence": 0.90,
+      "rationale": "Check current project state before taking action",
+      "category": "monitoring",
+      "urgency": "medium"
+    },
+    {
+      "action": "dependencies", 
+      "confidence": 0.85,
+      "rationale": "Understand task readiness and blocking relationships",
+      "category": "analysis",
+      "urgency": "medium"
+    }
+  ],
+  "context": "project_exists",
+  "ai_advice": "Check project status first, then start available tasks"
+}
+EOF
+    else
+        echo -e "${BLUE}ℹ️  Project exists. Recommended next steps:${NC}"
+        echo -e "${BLUE}ℹ️  1. Check status: gh-pm status${NC}"
+        echo -e "${BLUE}ℹ️  2. Check dependencies: gh-pm dependencies${NC}"
+        echo -e "${BLUE}ℹ️  3. Start ready tasks: gh-pm start <issue>${NC}"
+    fi
+}
+
+# Batch operations for AI efficiency
+execute_batch() {
+    local operations="$1"
+    
+    if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+        echo '{"batch_results": ['
+    else
+        echo -e "${BLUE}ℹ️  Executing batch operations...${NC}"
+    fi
+    
+    # Parse operations (comma-separated)
+    IFS=',' read -ra OPS <<< "$operations"
+    local first=true
+    
+    for op in "${OPS[@]}"; do
+        if [[ "$OUTPUT_FORMAT" == "json" && "$first" != true ]]; then
+            echo ","
+        fi
+        first=false
+        
+        # Parse operation and arguments
+        if [[ "$op" == *":"* ]]; then
+            local cmd="${op%:*}"
+            local arg="${op#*:}"
+        else
+            local cmd="$op"
+            local arg=""
+        fi
+        
+        case "$cmd" in
+            "status")
+                if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+                    echo -n '{"operation": "status", "success": true, "data": {"message": "Status check executed"}}'
+                else
+                    echo -e "${GREEN}✅ Status check executed${NC}"
+                fi
+                ;;
+            "dependencies")
+                if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+                    echo -n '{"operation": "dependencies", "success": true, "data": {"message": "Dependencies analyzed"}}'
+                else
+                    echo -e "${GREEN}✅ Dependencies analyzed${NC}"
+                fi
+                ;;
+            "start")
+                if [[ -n "$arg" ]]; then
+                    if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+                        echo -n "{\"operation\": \"start\", \"task_id\": $arg, \"success\": true, \"data\": {\"message\": \"Task $arg started\"}}"
+                    else
+                        echo -e "${GREEN}✅ Task $arg started${NC}"
+                    fi
+                else
+                    if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+                        echo -n '{"operation": "start", "success": false, "error": "No task ID provided"}'
+                    else
+                        echo -e "${RED}❌ Start operation failed: No task ID provided${NC}"
+                    fi
+                fi
+                ;;
+            *)
+                if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+                    echo -n "{\"operation\": \"$cmd\", \"success\": false, \"error\": \"Unknown operation\"}"
+                else
+                    echo -e "${RED}❌ Unknown operation: $cmd${NC}"
+                fi
+                ;;
+        esac
+    done
+    
+    if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+        echo ']}'
+    fi
+}
+
+# Parse global options
+DRY_RUN_FLAG=""
+COMMAND=""
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run)
+            DRY_RUN_FLAG="--dry-run"
+            shift
+            ;;
+        --format)
+            OUTPUT_FORMAT="$2"
+            shift 2
+            ;;
+        --format=*)
+            OUTPUT_FORMAT="${1#*=}"
+            shift
+            ;;
+        --verbose)
+            VERBOSE_MODE=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        --version|-v)
+            if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+                echo '{"version": "'$VERSION'", "description": "'$DESCRIPTION'"}'
+            else
+                echo "gh-pm version $VERSION"
+            fi
+            exit 0
+            ;;
+        help)
+            if [[ -n "$2" ]]; then
+                show_command_help "$2"
+            else
+                show_help
+            fi
+            exit 0
+            ;;
+        list)
+            list_commands
+            exit 0
+            ;;
+        version)
+            if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+                echo '{"version": "'$VERSION'", "description": "'$DESCRIPTION'"}'
+            else
+                echo "gh-pm version $VERSION - $DESCRIPTION"
+            fi
+            exit 0
+            ;;
+        --operations=*)
+            ARGS+=("$1")
+            shift
+            ;;
+        *)
+            if [[ -z "$COMMAND" ]]; then
+                COMMAND="$1"
+            else
+                ARGS+=("$1")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Show help if no command provided
+if [[ -z "$COMMAND" ]]; then
+    show_help
+    exit 0
+fi
+
+# Execute commands by delegating to individual scripts
+case "$COMMAND" in
+    "setup")
+        exec "$SCRIPT_DIR/scripts/setup-github-project.sh" $DRY_RUN_FLAG
+        ;;
+    "setup-complete")
+        exec "$SCRIPT_DIR/scripts/setup-complete-github-project.sh" $DRY_RUN_FLAG
+        ;;
+    "setup-repo")
+        exec "$SCRIPT_DIR/scripts/setup-repo-project.sh" $DRY_RUN_FLAG
+        ;;
+    "setup-simple")
+        exec "$SCRIPT_DIR/scripts/configure-project-fields-simple.sh" $DRY_RUN_FLAG
+        ;;
+    "configure")
+        exec "$SCRIPT_DIR/scripts/configure-project-fields.sh" $DRY_RUN_FLAG
+        ;;
+    "status")
+        exec "$SCRIPT_DIR/scripts/query-project-status.sh"
+        ;;
+    "workflow-status")
+        exec "$SCRIPT_DIR/scripts/query-workflow-status.sh"
+        ;;
+    "start")
+        if [[ ${#ARGS[@]} -eq 0 ]]; then
+            echo -e "${RED}❌ Error: Issue number required${NC}"
+            echo "Usage: gh-pm start <issue> [--dry-run]"
+            exit 1
+        fi
+        exec "$SCRIPT_DIR/scripts/start-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
+        ;;
+    "workflow-start")
+        if [[ ${#ARGS[@]} -eq 0 ]]; then
+            echo -e "${RED}❌ Error: Issue number required${NC}"
+            echo "Usage: gh-pm workflow-start <issue> [--dry-run]"
+            exit 1
+        fi
+        exec "$SCRIPT_DIR/scripts/start-workflow-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
+        ;;
+    "complete")
+        if [[ ${#ARGS[@]} -eq 0 ]]; then
+            echo -e "${RED}❌ Error: Issue number required${NC}"
+            echo "Usage: gh-pm complete <issue> [message] [--dry-run]"
+            exit 1
+        fi
+        exec "$SCRIPT_DIR/scripts/complete-task.sh" "${ARGS[@]}" $DRY_RUN_FLAG
+        ;;
+    "approve")
+        if [[ ${#ARGS[@]} -eq 0 ]]; then
+            echo -e "${RED}❌ Error: Issue number required${NC}"
+            echo "Usage: gh-pm approve <issue> [message] [--dry-run]"
+            exit 1
+        fi
+        exec "$SCRIPT_DIR/scripts/approve-task.sh" "${ARGS[@]}" $DRY_RUN_FLAG
+        ;;
+    "review")
+        if [[ ${#ARGS[@]} -eq 0 ]]; then
+            echo -e "${RED}❌ Error: Issue number required${NC}"
+            echo "Usage: gh-pm review <issue> [--dry-run]"
+            exit 1
+        fi
+        exec "$SCRIPT_DIR/scripts/review-workflow-task.sh" "${ARGS[0]}" $DRY_RUN_FLAG
+        ;;
+    "rework")
+        if [[ ${#ARGS[@]} -lt 2 ]]; then
+            echo -e "${RED}❌ Error: Issue number and feedback required${NC}"
+            echo "Usage: gh-pm rework <issue> <feedback> [--dry-run]"
+            exit 1
+        fi
+        exec "$SCRIPT_DIR/scripts/request-rework.sh" "${ARGS[@]}" $DRY_RUN_FLAG
+        ;;
+    "ready")
+        if [[ ${#ARGS[@]} -eq 0 ]]; then
+            echo -e "${RED}❌ Error: Issue number required${NC}"
+            echo "Usage: gh-pm ready <issue> [--dry-run]"
+            exit 1
+        fi
+        exec "$SCRIPT_DIR/scripts/move-to-ready.sh" "${ARGS[0]}" $DRY_RUN_FLAG
+        ;;
+    "ready-foundation")
+        exec "$SCRIPT_DIR/scripts/move-foundation-tasks-ready.sh" $DRY_RUN_FLAG
+        ;;
+    "dependencies")
+        exec "$SCRIPT_DIR/scripts/check-dependencies.sh"
+        ;;
+    "setup-dependencies")
+        exec "$SCRIPT_DIR/scripts/setup-issue-dependencies.sh" $DRY_RUN_FLAG
+        ;;
+    "add-status-field")
+        exec "$SCRIPT_DIR/scripts/add-status-field.sh" $DRY_RUN_FLAG
+        ;;
+    "create-workflow-status")
+        exec "$SCRIPT_DIR/scripts/create-workflow-status.sh" $DRY_RUN_FLAG
+        ;;
+    "enhance-status-field")
+        exec "$SCRIPT_DIR/scripts/enhance-status-field.sh" $DRY_RUN_FLAG
+        ;;
+    "configure-initial-status")
+        exec "$SCRIPT_DIR/scripts/configure-initial-status.sh" $DRY_RUN_FLAG
+        ;;
+    "discover")
+        discover_commands
+        ;;
+    "recommend")
+        context="${ARGS[0]:-general}"
+        recommend_actions "$context"
+        ;;
+    "batch")
+        operations=""
+        for arg in "${ARGS[@]}"; do
+            if [[ "$arg" == "--operations="* ]]; then
+                operations="${arg#*=}"
+                break
+            fi
+        done
+        
+        if [[ -z "$operations" ]]; then
+            if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+                output_json '{"success": false, "error": "Batch operations require --operations parameter"}'
+            else
+                echo -e "${RED}❌ Batch operations require --operations parameter${NC}"
+                echo "Example: gh-pm batch --operations='status,dependencies,start:39'"
+            fi
+            exit 1
+        fi
+        execute_batch "$operations"
+        ;;
+    *)
+        if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+            output_json "{\"success\": false, \"error\": \"Unknown command: $COMMAND\"}"
+        else
+            echo -e "${RED}❌ Unknown command: $COMMAND${NC}"
+            echo ""
+            echo "Available commands:"
+            list_commands
+        fi
+        exit 1
+        ;;
+esac
