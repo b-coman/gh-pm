@@ -233,7 +233,7 @@ jobs:
         
         # Check for key documentation files
         test -f README.md || { echo "❌ Missing README.md"; exit 1; }
-        test -f SECURITY_IMPROVEMENTS_COMPLETE.md || { echo "❌ Missing security documentation"; exit 1; }
+        test -f internal/status/SECURITY_IMPROVEMENTS_COMPLETE.md || { echo "❌ Missing security documentation"; exit 1; }
         
         # Check README has basic sections
         grep -q "Installation" README.md || { echo "❌ README missing Installation section"; exit 1; }
@@ -274,6 +274,11 @@ jobs:
         sed -i 's/YOUR_GITHUB_USERNAME/test-user/g' config.json
         sed -i 's/YOUR_REPOSITORY_NAME/test-repo/g' config.json
         sed -i 's/YOUR_PROJECT_ID/PVT_test123/g' config.json
+        sed -i 's/TASK_TYPE_FIELD_ID/PVTSSF_task_type/g' config.json
+        sed -i 's/RISK_LEVEL_FIELD_ID/PVTSSF_risk_level/g' config.json
+        sed -i 's/EFFORT_FIELD_ID/PVTSSF_effort/g' config.json
+        sed -i 's/STATUS_FIELD_ID/PVTSSF_status/g' config.json
+        sed -i 's/DEPENDENCIES_FIELD_ID/PVTSSF_dependencies/g' config.json
         
         # Test config validation
         if validate_config; then
